@@ -31,6 +31,9 @@
         .btn-main:active { transform: scale(0.96); }
         .btn-main.outline { background: white; color: var(--red-color); border: 2px solid var(--red-color); box-shadow: none; }
         
+        .btn-compare { width: 100%; background: linear-gradient(135deg, #4caf50, #388e3c); color: white; border: none; border-radius: 10px; padding: 12px 0; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(76,175,80,0.3); margin-bottom: 15px; transition: transform 0.1s; }
+        .btn-compare:active { transform: scale(0.96); }
+
         .toggle-row { display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; padding: 10px 15px; border-radius: 10px; }
         .toggle-label { font-size: 14px; font-weight: bold; color: #333; }
         .toggle-desc { font-size: 12px; color: var(--text-reg); margin-top: 2px;}
@@ -63,7 +66,9 @@
 
         /* 追号列表 */
         .watch-card { background: var(--card-bg); border-radius: 16px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px; display: none; border-left: 5px solid #ffb300; }
-        .watch-title { display: flex; justify-content: space-between; margin-bottom: 15px; font-weight: bold; color: #333; }
+        .watch-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; font-weight: bold; color: #333; }
+        .btn-manual { background: #fff; color: #ffb300; border: 1px solid #ffb300; padding: 4px 10px; border-radius: 6px; font-size: 13px; cursor: pointer; transition: 0.2s;}
+        .btn-manual:hover { background: #ffb300; color: white; }
         .watch-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .btn-del { color: #999; background: none; border: none; font-size: 20px; cursor: pointer; }
 
@@ -74,7 +79,7 @@
         .history-item:last-child { border: none; }
         .history-info { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-reg); margin-bottom: 8px; }
         
-        /* 弹窗 */
+        /* 弹窗通用 */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(3px); }
         .modal-content { background: white; width: 85%; max-width: 400px; border-radius: 20px; padding: 25px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.2); position: relative; overflow: hidden;}
         
@@ -83,9 +88,19 @@
         .modal-content.win-bg::before { content: '🎉'; position: absolute; font-size: 100px; opacity: 0.1; top: -20px; right: -20px; transform: rotate(20deg); }
 
         .modal h2 { margin: 0 0 10px 0; color: var(--text-main); font-size: 20px; }
-        .match-detail { background: #f8f9fa; border-radius: 10px; padding: 15px; margin: 15px 0; font-size: 14px; }
+        .match-detail { background: #f8f9fa; border-radius: 10px; padding: 15px; margin: 15px 0; font-size: 14px; text-align: left;}
         .prize-level { color: var(--red-color); font-size: 18px; font-weight: 900; margin-bottom: 5px; display: block;}
         .btn-close { background: var(--red-color); color: white; border: none; border-radius: 10px; padding: 12px 0; width: 100%; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+
+        /* 手动输入弹窗专用样式 */
+        .input-row { display: flex; justify-content: center; gap: 6px; margin-bottom: 15px; }
+        .num-input { width: 35px; height: 35px; text-align: center; font-size: 16px; font-weight: bold; border: 1px solid #ccc; border-radius: 8px; outline: none; }
+        .num-input.red-in { color: var(--red-color); border-color: #ffcdd2; background: #ffebee; }
+        .num-input.red-in:focus { border-color: var(--red-color); }
+        .num-input.blue-in { color: var(--blue-color); border-color: #bbdefb; background: #e3f2fd; }
+        .num-input.blue-in:focus { border-color: var(--blue-color); }
+        .btn-submit { background: var(--red-color); color: white; border: none; border-radius: 10px; padding: 12px 0; width: 100%; font-size: 16px; font-weight: bold; cursor: pointer; }
+        .btn-cancel { background: #eee; color: #333; border: none; border-radius: 10px; padding: 10px 0; width: 100%; font-size: 14px; font-weight: bold; cursor: pointer; margin-top: 10px; }
 
         .toast { position: fixed; bottom: 50px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 10px 20px; border-radius: 30px; font-size: 14px; display: none; z-index: 2000; }
     </style>
@@ -106,6 +121,9 @@
             <button class="btn-main" onclick="generate(1)">机选一注</button>
             <button class="btn-main outline" onclick="generate(3)">机选三注</button>
         </div>
+        
+        <button class="btn-compare" onclick="checkPrize(false)">🎯 手动比对最新开奖</button>
+
         <div class="toggle-row">
             <div>
                 <div class="toggle-label">防连出降权机制</div>
@@ -126,7 +144,8 @@
     <!-- 追号重点 -->
     <div class="watch-card" id="watchBox">
         <div class="watch-title">
-            <span>⭐ 我的追号 (最多3注)</span>
+            <span>⭐ 我的追号 (最多5注)</span>
+            <button class="btn-manual" onclick="openManualInput()">✏️ 手动添加</button>
         </div>
         <div id="watchListDisplay"></div>
     </div>
@@ -147,23 +166,48 @@
     </div>
 </div>
 
+<!-- 手动输入弹窗 -->
+<div class="modal-overlay" id="manualModal">
+    <div class="modal-content">
+        <h2 style="margin-bottom: 20px; color: var(--text-main);">手动输入号码</h2>
+        
+        <!-- 红球输入 -->
+        <div style="font-size: 13px; color: var(--text-reg); margin-bottom: 5px; text-align: left;">红球 (01-33，不重复)</div>
+        <div class="input-row">
+            <input type="number" id="r1" class="num-input red-in" maxlength="2" placeholder="01">
+            <input type="number" id="r2" class="num-input red-in" maxlength="2" placeholder="02">
+            <input type="number" id="r3" class="num-input red-in" maxlength="2" placeholder="03">
+            <input type="number" id="r4" class="num-input red-in" maxlength="2" placeholder="04">
+            <input type="number" id="r5" class="num-input red-in" maxlength="2" placeholder="05">
+            <input type="number" id="r6" class="num-input red-in" maxlength="2" placeholder="06">
+        </div>
+        
+        <!-- 蓝球输入 -->
+        <div style="font-size: 13px; color: var(--text-reg); margin-bottom: 5px; text-align: left;">蓝球 (01-16)</div>
+        <div class="input-row" style="justify-content: flex-start;">
+            <input type="number" id="b1" class="num-input blue-in" maxlength="2" placeholder="01">
+        </div>
+
+        <button class="btn-submit" onclick="saveManualTicket()">确认添加</button>
+        <button class="btn-cancel" onclick="closeManualInput()">取消</button>
+    </div>
+</div>
+
 <script>
-    // 🛡️ Base64 伪装的真实 GitHub 双色球数据源
     const b64Url = "aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL3dhbmdkYW9kYW8vRG91YmxlQ29sb3JCYWxsL21haW4vZGF0YS8yMDI2Lmpzb24=";
     const DATA_URL = atob(b64Url); 
 
     let latestHistory = []; 
     let myWatchlist = JSON.parse(localStorage.getItem('ssq_watchlist')) || [];
-    let currentDraw = []; // 最新一期数据
+    let currentDraw = null; 
 
-    // 初始化
     async function init() {
         renderWatchlist();
         try {
             const res = await fetch(`${DATA_URL}?t=${Date.now()}`);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const yearData = await res.json();
-            latestHistory = yearData.data.slice(-10).reverse(); // 取最新10期
+            latestHistory = yearData.data.slice(-10).reverse(); 
             
             if (latestHistory.length > 0) {
                 currentDraw = latestHistory[0];
@@ -171,7 +215,6 @@
                 document.getElementById('status').style.color = "#10b981";
                 renderHistory(latestHistory);
 
-                // 自动比对并弹窗
                 if (myWatchlist.length > 0) {
                     setTimeout(() => { checkPrize(true); }, 800);
                 }
@@ -182,7 +225,6 @@
         }
     }
 
-    // 渲染历史记录
     function renderHistory(dataList) {
         const container = document.getElementById('historyList');
         container.innerHTML = '';
@@ -202,7 +244,6 @@
         });
     }
 
-    // 概率计算
     function getStreak(num, type, history) {
         let streak = 0;
         for (let i = 0; i < Math.min(3, history.length); i++) {
@@ -221,7 +262,6 @@
         return 1.0;                      
     }
 
-    // 生成一注号码
     function generateOneTicket(useProb) {
         let poolRed = [];
         for (let i = 1; i <= 33; i++) {
@@ -259,7 +299,6 @@
         return { red: reds, blue: blue };
     }
 
-    // 点击机选
     function generate(count) {
         if (latestHistory.length === 0) { showToast("数据加载中，请稍候"); return; }
         
@@ -289,25 +328,30 @@
         }
     }
 
-    // 复制号码
     function copyTicket(ticket) {
         let text = ticket.red.map(n => String(n).padStart(2,'0')).join(' ') + ' + ' + String(ticket.blue).padStart(2,'0');
         navigator.clipboard.writeText(text).then(() => { showToast("号码已复制"); });
     }
 
-    // 保存追号
+    // 核心保存逻辑，上限改为 5
     function saveWatch(ticket) {
-        if (myWatchlist.length >= 3) { showToast("最多只能追号 3 注！"); return; }
-        if (myWatchlist.some(w => w.red.join() === ticket.red.join() && w.blue === ticket.blue)) return;
+        if (myWatchlist.length >= 5) { showToast("最多只能追号 5 注！"); return; }
+        if (myWatchlist.some(w => w.red.join() === ticket.red.join() && w.blue === ticket.blue)) {
+            showToast("这注号码已经在追号列表里了"); return;
+        }
         
         myWatchlist.push(ticket);
         localStorage.setItem('ssq_watchlist', JSON.stringify(myWatchlist));
         renderWatchlist();
-        generate(document.querySelectorAll('.result-item').length); // 刷新按钮状态
+        
+        // 如果当前有显示的机选结果，刷新一下按钮状态
+        if(document.getElementById('resultBox').style.display === 'block') {
+            generate(document.querySelectorAll('.result-item').length);
+        }
+        
         showToast("追号成功");
     }
 
-    // 移除追号
     function removeWatch(index) {
         myWatchlist.splice(index, 1);
         localStorage.setItem('ssq_watchlist', JSON.stringify(myWatchlist));
@@ -317,14 +361,19 @@
         }
     }
 
-    // 渲染追号列表
     function renderWatchlist() {
         let box = document.getElementById('watchBox');
         let display = document.getElementById('watchListDisplay');
-        if (myWatchlist.length === 0) { box.style.display = 'none'; return; }
         
-        box.style.display = 'block';
+        // 就算没有追号，也要显示 box，因为有手动添加按钮
+        box.style.display = 'block'; 
         display.innerHTML = '';
+        
+        if (myWatchlist.length === 0) {
+            display.innerHTML = '<div style="text-align:center; color:#ccc; font-size:13px; padding:10px;">暂无追号，可机选或手动添加</div>';
+            return;
+        }
+
         myWatchlist.forEach((ticket, index) => {
             let redHtml = ticket.red.map(n => `<span class="ball red" style="width:28px;height:28px;font-size:14px;">${String(n).padStart(2,'0')}</span>`).join('');
             let blueHtml = `<span class="ball blue" style="width:28px;height:28px;font-size:14px;">${String(ticket.blue).padStart(2,'0')}</span>`;
@@ -337,7 +386,6 @@
         });
     }
 
-    // 判定奖级
     function getPrizeLevel(redHit, blueHit) {
         if (redHit === 6 && blueHit === 1) return { level: '一等奖', money: '浮动(500万起)' };
         if (redHit === 6 && blueHit === 0) return { level: '二等奖', money: '浮动' };
@@ -348,14 +396,17 @@
         return null;
     }
 
-    // 执行比对
     function checkPrize(isAuto = false) {
-        if (!currentDraw || myWatchlist.length === 0) return;
+        if (!currentDraw) { showToast("数据未加载完毕"); return; }
+        if (myWatchlist.length === 0) { if(!isAuto) showToast("请先添加追号！"); return; }
         
         let drawRed = currentDraw.red;
         let drawBlue = currentDraw.blue;
         let hasWin = false;
-        let bodyHtml = `<div style="font-size:13px;color:#666;margin-bottom:15px;">第 <b>${currentDraw.code}</b> 期开奖：<br><span style="color:#e53935;font-weight:bold;">${drawRed.join(' ')}</span> <span style="color:#1e88e5;font-weight:bold;">+ ${drawBlue}</span></div>`;
+        
+        let bodyHtml = `<div style="font-size:13px;color:#666;margin-bottom:15px;text-align:center;">第 <b>${currentDraw.code}</b> 期开奖：<br>
+                        <span style="color:#e53935;font-weight:bold;">${drawRed.map(n=>String(n).padStart(2,'0')).join(' ')}</span> 
+                        <span style="color:#1e88e5;font-weight:bold;">+ ${String(drawBlue).padStart(2,'0')}</span></div>`;
 
         myWatchlist.forEach((ticket, index) => {
             let hitRed = ticket.red.filter(n => drawRed.includes(n)).length;
@@ -365,15 +416,15 @@
             if (prize) {
                 hasWin = true;
                 bodyHtml += `
-                    <div style="border-top:1px dashed #eee;padding-top:10px;margin-top:10px;text-align:left;">
+                    <div style="border-top:1px dashed #ccc;padding-top:10px;margin-top:10px;">
                         <span class="prize-level">🎉 第 ${index+1} 注：${prize.level} (${prize.money})</span>
                         <div style="font-size:12px;color:#555;">命中红球 ${hitRed} 个，蓝球 ${hitBlue} 个</div>
                     </div>
                 `;
             } else if (!isAuto) {
                 bodyHtml += `
-                    <div style="border-top:1px dashed #eee;padding-top:10px;margin-top:10px;text-align:left;color:#999;">
-                        <span style="font-weight:bold;">第 ${index+1} 注：未中奖</span>
+                    <div style="border-top:1px dashed #ccc;padding-top:10px;margin-top:10px;color:#999;">
+                        <span style="font-weight:bold; color:#333;">第 ${index+1} 注：未中奖</span>
                         <div style="font-size:12px;">命中红球 ${hitRed} 个，蓝球 ${hitBlue} 个</div>
                     </div>
                 `;
@@ -402,6 +453,65 @@
         toast.innerText = msg;
         toast.style.display = 'block';
         setTimeout(() => { toast.style.display = 'none'; }, 2000);
+    }
+
+    // ================= 手动输入相关逻辑 =================
+    function openManualInput() {
+        if (myWatchlist.length >= 5) {
+            showToast("追号已满 5 注，无法继续添加！");
+            return;
+        }
+        // 清空输入框
+        for(let i=1; i<=6; i++) document.getElementById(`r${i}`).value = '';
+        document.getElementById('b1').value = '';
+        
+        document.getElementById('manualModal').style.display = 'flex';
+    }
+
+    function closeManualInput() {
+        document.getElementById('manualModal').style.display = 'none';
+    }
+
+    function saveManualTicket() {
+        let reds = [];
+        // 获取红球
+        for(let i=1; i<=6; i++) {
+            let val = parseInt(document.getElementById(`r${i}`).value);
+            if (isNaN(val) || val < 1 || val > 33) {
+                showToast(`第 ${i} 个红球输入无效 (需在 01-33 之间)`);
+                return;
+            }
+            if (reds.includes(val)) {
+                showToast(`红球号码不能重复！`);
+                return;
+            }
+            reds.push(val);
+        }
+        
+        // 获取蓝球
+        let blueVal = parseInt(document.getElementById('b1').value);
+        if (isNaN(blueVal) || blueVal < 1 || blueVal > 16) {
+            showToast(`蓝球输入无效 (需在 01-16 之间)`);
+            return;
+        }
+
+        // 排序
+        reds.sort((a,b) => a-b);
+
+        let ticket = { red: reds, blue: blueVal };
+        
+        // 检查是否重复
+        if (myWatchlist.some(w => w.red.join() === ticket.red.join() && w.blue === ticket.blue)) {
+            showToast("这注号码已经在追号列表里了");
+            return;
+        }
+
+        // 存入
+        myWatchlist.push(ticket);
+        localStorage.setItem('ssq_watchlist', JSON.stringify(myWatchlist));
+        renderWatchlist();
+        closeManualInput();
+        showToast("手动添加成功！");
     }
 
     window.onload = init;
