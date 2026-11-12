@@ -3,239 +3,212 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智能仓储拣货终端 WMS</title>
+    <title>双色球智能选号助手</title>
     <style>
         :root {
-            --bg-page: #eef2f5;
-            --bg-card: #ffffff;
-            --text-main: #1e293b;
-            --text-reg: #64748b;
-            --border: #cbd5e1;
-            --primary: #0f172a;
-            --primary-hover: #334155;
-            --accent: #0284c7;
-            --warning: #d97706;
-            --danger: #dc2626;
-            --font-mono: 'Courier New', Courier, monospace;
+            --red-color: #e53935;
+            --red-glow: #ff5252;
+            --blue-color: #1e88e5;
+            --blue-glow: #42a5f5;
+            --bg-color: #f2f4f8;
+            --card-bg: #ffffff;
+            --text-main: #2c3e50;
+            --text-reg: #7f8c8d;
         }
-
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-page); padding: 20px; color: var(--text-main); margin: 0;}
+        body { font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; background-color: var(--bg-color); margin: 0; padding: 15px; color: var(--text-main); }
+        .container { max-width: 600px; margin: 0 auto; }
         
-        /* 模拟工业终端的外壳 */
-        .terminal-wrapper { max-width: 850px; margin: 0 auto; border: 2px solid var(--primary); border-radius: 6px; background: var(--bg-card); box-shadow: 4px 4px 0 rgba(0,0,0,0.1); overflow: hidden;}
-        
-        /* 顶部黑条 */
-        .terminal-header { background: var(--primary); color: #fff; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); }
-        .terminal-header h1 { margin: 0; font-size: 16px; letter-spacing: 1px; font-weight: 600;}
-        .status { font-size: 12px; color: #94a3b8; }
+        /* 顶部标题 */
+        .header { text-align: center; margin-bottom: 20px; }
+        .header h1 { color: var(--red-color); font-size: 24px; margin: 0 0 5px 0; font-weight: 900; letter-spacing: 1px;}
+        .header p { color: var(--text-reg); font-size: 13px; margin: 0; }
 
-        .content-area { padding: 25px; }
-
-        /* 控制面板 */
-        .control-panel { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed var(--border); padding-bottom: 20px; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;}
+        /* 主控制面板 */
+        .control-card { background: var(--card-bg); border-radius: 16px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px; }
         
-        .switch-container { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: bold; color: var(--text-reg); font-family: var(--font-mono);}
-        .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+        .action-row { display: flex; gap: 10px; margin-bottom: 15px; }
+        .btn-main { flex: 1; background: linear-gradient(135deg, #e53935, #c62828); color: white; border: none; border-radius: 10px; padding: 15px 0; font-size: 18px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(229,57,53,0.3); transition: transform 0.1s; }
+        .btn-main:active { transform: scale(0.96); }
+        .btn-main.outline { background: white; color: var(--red-color); border: 2px solid var(--red-color); box-shadow: none; }
+        
+        .toggle-row { display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; padding: 10px 15px; border-radius: 10px; }
+        .toggle-label { font-size: 14px; font-weight: bold; color: #333; }
+        .toggle-desc { font-size: 12px; color: var(--text-reg); margin-top: 2px;}
+        
+        /* 开关 */
+        .switch { position: relative; display: inline-block; width: 50px; height: 28px; }
         .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #cbd5e1; transition: .2s; border-radius: 4px;}
-        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 4px; bottom: 4px; background-color: white; transition: .2s; border-radius: 2px;}
-        input:checked + .slider { background-color: var(--accent); }
-        input:checked + .slider:before { transform: translateX(20px); }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .3s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 4px; bottom: 4px; background-color: white; transition: .3s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--red-color); }
+        input:checked + .slider:before { transform: translateX(22px); }
 
-        .controls-right { display: flex; gap: 10px; align-items: center; }
-        .select-box { padding: 8px 12px; font-size: 13px; border: 1px solid var(--primary); border-radius: 3px; outline: none; font-family: var(--font-mono); }
-        .btn { padding: 8px 16px; background-color: var(--primary); color: white; border: 1px solid var(--primary); border-radius: 3px; font-size: 13px; cursor: pointer; transition: 0.2s; font-family: var(--font-mono); font-weight: bold; }
-        .btn:hover { background-color: var(--primary-hover); }
-        .btn-outline { background: #fff; color: var(--primary); }
-        .btn-outline:hover { background: #f1f5f9; }
-
-        /* 输出结果区 (模拟打印出来的拣货单) */
-        .output-panel { display: none; background: #f8fafc; border: 1px solid var(--border); border-left: 4px solid var(--accent); padding: 20px; margin-bottom: 25px; }
-        .output-title { font-family: var(--font-mono); font-size: 14px; font-weight: bold; border-bottom: 1px dashed var(--border); padding-bottom: 10px; margin-bottom: 15px; color: var(--primary); display: flex; justify-content: space-between;}
+        /* 选号结果区 */
+        .result-card { background: var(--card-bg); border-radius: 16px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px; display: none; border-top: 5px solid var(--red-color); }
+        .result-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px dashed #eee; }
+        .result-item:last-child { border-bottom: none; }
         
-        .pick-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px dotted #e2e8f0; }
-        .pick-row:last-child { border-bottom: none; }
+        /* 真实的球体样式 */
+        .ball-group { display: flex; flex-wrap: wrap; gap: 6px; }
+        .ball { width: 36px; height: 36px; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 16px; font-weight: bold; color: white; font-family: 'Arial', sans-serif; position: relative; }
+        .ball.red { background: radial-gradient(circle at 35% 35%, var(--red-glow), var(--red-color)); box-shadow: inset -3px -3px 6px rgba(0,0,0,0.2), 0 3px 5px rgba(229,57,53,0.4); }
+        .ball.blue { background: radial-gradient(circle at 35% 35%, var(--blue-glow), var(--blue-color)); box-shadow: inset -3px -3px 6px rgba(0,0,0,0.2), 0 3px 5px rgba(30,136,229,0.4); }
+        .ball.plus { background: none; box-shadow: none; color: #999; width: 15px; font-size: 18px; }
+
+        .action-btns { display: flex; gap: 6px; }
+        .btn-small { padding: 6px 12px; border-radius: 6px; border: none; font-size: 13px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-save { background: #ffb300; color: white; }
+        .btn-save:disabled { background: #ccc; }
+        .btn-copy { background: #e0e0e0; color: #333; }
+
+        /* 追号列表 */
+        .watch-card { background: var(--card-bg); border-radius: 16px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px; display: none; border-left: 5px solid #ffb300; }
+        .watch-title { display: flex; justify-content: space-between; margin-bottom: 15px; font-weight: bold; color: #333; }
+        .watch-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .btn-del { color: #999; background: none; border: none; font-size: 20px; cursor: pointer; }
+
+        /* 历史记录区 */
+        .history-card { background: var(--card-bg); border-radius: 16px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .history-title { font-size: 16px; font-weight: bold; margin-bottom: 15px; border-left: 4px solid var(--red-color); padding-left: 10px; }
+        .history-item { border-bottom: 1px solid #f0f0f0; padding: 10px 0; }
+        .history-item:last-child { border: none; }
+        .history-info { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-reg); margin-bottom: 8px; }
         
-        /* 伪装成货架编号 */
-        .shelf-tag { display: inline-block; font-family: var(--font-mono); font-size: 16px; font-weight: bold; color: var(--primary); background: #fff; border: 1px solid var(--primary); padding: 2px 8px; border-radius: 2px; margin: 0 4px; box-shadow: 2px 2px 0 #e2e8f0; }
-        .shelf-tag.b-zone { border-color: var(--warning); color: var(--warning); }
-
-        .action-group { display: flex; gap: 8px; }
-        .mini-btn { background: #fff; color: var(--text-main); border: 1px solid var(--border); padding: 4px 10px; border-radius: 3px; font-size: 12px; cursor: pointer; font-family: var(--font-mono); transition: 0.2s;}
-        .mini-btn:hover { background: #f1f5f9; border-color: var(--text-reg); }
-        .mini-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-        /* 跟进队列 */
-        .queue-panel { display: none; background: #fffbeb; border: 1px solid #fcd34d; padding: 15px; margin-bottom: 25px; }
-        .queue-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-family: var(--font-mono); font-size: 13px; font-weight: bold; color: var(--warning); }
-        .clear-btn { background: none; border: none; color: var(--danger); cursor: pointer; font-family: var(--font-mono); font-weight: bold; }
-        .queue-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px dashed #fcd34d; font-family: var(--font-mono); font-size: 14px;}
-        .queue-item:last-child { border-bottom: none; }
-
-        /* 历史记录表格 (工业感) */
-        .history-title { font-family: var(--font-mono); font-size: 14px; font-weight: bold; background: var(--primary); color: #fff; padding: 6px 10px; display: inline-block; margin-bottom: 15px; }
-        table { width: 100%; border-collapse: collapse; font-size: 13px; font-family: var(--font-mono); border: 1px solid var(--border); }
-        th { background-color: #f1f5f9; color: var(--text-main); font-weight: bold; text-align: left; padding: 10px 12px; border-bottom: 2px solid var(--border); border-right: 1px solid var(--border);}
-        td { padding: 10px 12px; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); }
-        tr:nth-child(even) { background-color: #f8fafc; }
-
-        /* 弹窗 (盘点报告) */
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.7); z-index: 1000; justify-content: center; align-items: center; }
-        .modal-content { background: #fff; width: 90%; max-width: 600px; border: 2px solid var(--primary); border-radius: 4px; box-shadow: 6px 6px 0 rgba(0,0,0,0.2); max-height: 80vh; overflow-y: auto; }
-        .modal-header { background: var(--primary); color: #fff; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); }
-        .modal-header h2 { margin: 0; font-size: 15px; }
-        .close-btn { background: none; border: none; color: #fff; font-size: 20px; cursor: pointer; }
-        .modal-body { padding: 20px; }
+        /* 弹窗 */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(3px); }
+        .modal-content { background: white; width: 85%; max-width: 400px; border-radius: 20px; padding: 25px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.2); position: relative; overflow: hidden;}
         
-        .report-box { border: 1px solid var(--border); margin-bottom: 15px; font-family: var(--font-mono); }
-        .report-header { background: #f1f5f9; padding: 8px 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; font-size: 12px; font-weight: bold;}
-        .report-content { padding: 12px; font-size: 14px;}
-        .match-high { color: var(--danger); }
-        .match-normal { color: var(--text-reg); }
-        
-        .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: var(--primary); color: white; padding: 10px 20px; border-radius: 4px; font-size: 13px; z-index: 2000; display: none; font-family: var(--font-mono); box-shadow: 4px 4px 0 rgba(0,0,0,0.2); }
+        /* 中奖特殊背景 */
+        .modal-content.win-bg { background: linear-gradient(135deg, #fffdf5, #fff3e0); border: 2px solid #ffb300; }
+        .modal-content.win-bg::before { content: '🎉'; position: absolute; font-size: 100px; opacity: 0.1; top: -20px; right: -20px; transform: rotate(20deg); }
 
-        @media (max-width: 600px) {
-            .control-panel { flex-direction: column; align-items: stretch; }
-            .controls-right { flex-wrap: wrap; justify-content: space-between;}
-            .pick-row { flex-direction: column; align-items: flex-start; gap: 10px; }
-            .action-group { width: 100%; justify-content: flex-end; }
-            table { display: block; overflow-x: auto; }
-        }
+        .modal h2 { margin: 0 0 10px 0; color: var(--text-main); font-size: 20px; }
+        .match-detail { background: #f8f9fa; border-radius: 10px; padding: 15px; margin: 15px 0; font-size: 14px; }
+        .prize-level { color: var(--red-color); font-size: 18px; font-weight: 900; margin-bottom: 5px; display: block;}
+        .btn-close { background: var(--red-color); color: white; border: none; border-radius: 10px; padding: 12px 0; width: 100%; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+
+        .toast { position: fixed; bottom: 50px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 10px 20px; border-radius: 30px; font-size: 14px; display: none; z-index: 2000; }
     </style>
 </head>
 <body>
 
-<div class="toast" id="toast">已复制到剪贴板</div>
+<div class="toast" id="toast">提示信息</div>
 
-<div class="terminal-wrapper">
-    <div class="terminal-header">
-        <h1>[WMS] 智能仓储拣货终端 v3.0</h1>
-        <div class="status" id="status">连接中...</div>
+<div class="container">
+    <div class="header">
+        <h1>双色球智能选号</h1>
+        <p id="status">正在同步最新开奖数据...</p>
     </div>
 
-    <div class="content-area">
-        <div class="control-panel">
-            <div class="switch-container">
-                <label class="switch">
-                    <input type="checkbox" id="probSwitch" checked>
-                    <span class="slider"></span>
-                </label>
-                <span>开启排班防重机制 (避免重复派单)</span>
-            </div>
-
-            <div class="controls-right">
-                <select id="pickCount" class="select-box">
-                    <option value="1">生成 1 张拣货单</option>
-                    <option value="3">生成 3 张拣货单</option>
-                </select>
-                <button class="btn" onclick="generateNewTickets()">执行拣货</button>
-                <button class="btn btn-outline" onclick="openCompareModal()">出库盘点</button>
-            </div>
+    <!-- 控制面板 -->
+    <div class="control-card">
+        <div class="action-row">
+            <button class="btn-main" onclick="generate(1)">机选一注</button>
+            <button class="btn-main outline" onclick="generate(3)">机选三注</button>
         </div>
-        
-        <!-- 结果输出区 -->
-        <div class="output-panel" id="resultBox">
-            <div class="output-title">
-                <span>=== 拣货任务单 ===</span>
-                <span id="modeInfo" style="color:var(--text-reg); font-weight:normal;"></span>
+        <div class="toggle-row">
+            <div>
+                <div class="toggle-label">防连出降权机制</div>
+                <div class="toggle-desc" id="modeDesc">近期出现过的号码，自动降低概率</div>
             </div>
-            <div id="pickDisplay"></div>
+            <label class="switch">
+                <input type="checkbox" id="probSwitch" checked>
+                <span class="slider"></span>
+            </label>
         </div>
+    </div>
 
-        <!-- 跟进队列区 -->
-        <div class="queue-panel" id="followBox">
-            <div class="queue-header">
-                <span>⚠️ 异常单跟进队列 (MAX: 3)</span>
-                <button class="clear-btn" onclick="clearFollow()">[清空队列]</button>
-            </div>
-            <div id="followList"></div>
+    <!-- 生成结果 -->
+    <div class="result-card" id="resultBox">
+        <div id="pickDisplay"></div>
+    </div>
+
+    <!-- 追号重点 -->
+    <div class="watch-card" id="watchBox">
+        <div class="watch-title">
+            <span>⭐ 我的追号 (最多3注)</span>
         </div>
+        <div id="watchListDisplay"></div>
+    </div>
 
-        <!-- 历史记录 -->
-        <div class="history-title">近期出库批次存档</div>
-        <table>
-            <thead>
-                <tr>
-                    <th>出库单号</th>
-                    <th>拣货时间</th>
-                    <th>A区明细 (1-33)</th>
-                    <th>B区备件 (1-16)</th>
-                </tr>
-            </thead>
-            <tbody id="lotteryData">
-                <tr><td colspan="4" style="text-align:center;">读取数据库中...</td></tr>
-            </tbody>
-        </table>
+    <!-- 历史开奖 -->
+    <div class="history-card">
+        <div class="history-title">近 10 期开奖结果</div>
+        <div id="historyList"></div>
     </div>
 </div>
 
-<!-- 盘点弹窗 -->
-<div class="modal-overlay" id="compareModal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h2>出库异常盘点报告</h2>
-            <button class="close-btn" onclick="closeCompareModal()">×</button>
-        </div>
-        <div class="modal-body" id="modalBody">
-            <!-- 动态渲染 -->
-        </div>
+<!-- 中奖弹窗 -->
+<div class="modal-overlay" id="modal">
+    <div class="modal-content" id="modalContentBox">
+        <h2 id="modalTitle">开奖比对结果</h2>
+        <div class="match-detail" id="modalBody"></div>
+        <button class="btn-close" onclick="closeModal()">我知道了</button>
     </div>
 </div>
 
 <script>
-    // 兜底数据
-    const fallbackData = [
-        { code: "OUT-2026130", date: "2026-11-12", red: [04, 09, 10, 15, 22, 29], blue: 08 },
-        { code: "OUT-2026129", date: "2026-11-10", red: [03, 09, 16, 20, 25, 30], blue: 05 },
-        { code: "OUT-2026128", date: "2026-11-08", red: [05, 06, 10, 25, 27, 30], blue: 11 },
-        { code: "OUT-2026127", date: "2026-11-05", red: [13, 14, 19, 25, 29, 32], blue: 12 },
-        { code: "OUT-2026126", date: "2026-11-03", red: [09, 10, 13, 22, 29, 32], blue: 12 }
-    ];
-
+    // 🛡️ Base64 伪装的真实 GitHub 双色球数据源
     const b64Url = "aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL3dhbmdkYW9kYW8vRG91YmxlQ29sb3JCYWxsL21haW4vZGF0YS8yMDI2Lmpzb24=";
     const DATA_URL = atob(b64Url); 
 
     let latestHistory = []; 
-    let myFollows = JSON.parse(localStorage.getItem('wms_follows')) || []; 
-    let currentTickets = []; 
+    let myWatchlist = JSON.parse(localStorage.getItem('ssq_watchlist')) || [];
+    let currentDraw = []; // 最新一期数据
 
-    async function fetchData() {
-        const statusEl = document.getElementById('status');
-        const tbody = document.getElementById('lotteryData');
-        
+    // 初始化
+    async function init() {
+        renderWatchlist();
         try {
             const res = await fetch(`${DATA_URL}?t=${Date.now()}`);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const yearData = await res.json();
-            latestHistory = yearData.data.slice(-10).reverse(); 
-            statusEl.innerText = `同步成功 | ${new Date().toLocaleTimeString()}`;
-            statusEl.style.color = "#34d399";
+            latestHistory = yearData.data.slice(-10).reverse(); // 取最新10期
+            
+            if (latestHistory.length > 0) {
+                currentDraw = latestHistory[0];
+                document.getElementById('status').innerText = `数据已同步 (最新第 ${currentDraw.code} 期)`;
+                document.getElementById('status').style.color = "#10b981";
+                renderHistory(latestHistory);
+
+                // 自动比对并弹窗
+                if (myWatchlist.length > 0) {
+                    setTimeout(() => { checkPrize(true); }, 800);
+                }
+            }
         } catch (e) {
-            latestHistory = fallbackData; 
-            statusEl.innerText = `离线模式 | 读取本地缓存`;
-            statusEl.style.color = "#fbbf24";
-        } finally {
-            renderTable(latestHistory);
+            document.getElementById('status').innerText = `网络异常，请稍后重试`;
+            document.getElementById('status').style.color = "#e53935";
         }
     }
 
-    function getArr(item) {
-        if (Array.isArray(item.red)) return item.red.map(Number);
-        if (typeof item.red === 'string') return item.red.split(/[,\s]+/).map(Number);
-        return [];
+    // 渲染历史记录
+    function renderHistory(dataList) {
+        const container = document.getElementById('historyList');
+        container.innerHTML = '';
+        dataList.forEach(item => {
+            let redHtml = item.red.map(n => `<span class="ball red" style="width:28px;height:28px;font-size:14px;">${String(n).padStart(2,'0')}</span>`).join('');
+            let blueHtml = `<span class="ball blue" style="width:28px;height:28px;font-size:14px;">${String(item.blue).padStart(2,'0')}</span>`;
+            
+            container.innerHTML += `
+                <div class="history-item">
+                    <div class="history-info">
+                        <span>第 ${item.code} 期</span>
+                        <span>${item.date}</span>
+                    </div>
+                    <div class="ball-group">${redHtml}<span class="ball plus">+</span>${blueHtml}</div>
+                </div>
+            `;
+        });
     }
 
+    // 概率计算
     function getStreak(num, type, history) {
         let streak = 0;
         for (let i = 0; i < Math.min(3, history.length); i++) {
-            if (type === 'main') {
-                if (getArr(history[i]).includes(num)) streak++;
-                else break;
-            } else {
-                if (Number(history[i].blue) === num) streak++;
-                else break;
-            }
+            let isHit = type === 'red' ? history[i].red.includes(num) : history[i].blue === num;
+            if (isHit) streak++;
+            else break;
         }
         return streak;
     }
@@ -248,271 +221,190 @@
         return 1.0;                      
     }
 
-    // 渲染历史表格，加上 A- 和 B- 前缀
-    function renderTable(dataList) {
-        const tbody = document.getElementById('lotteryData');
-        tbody.innerHTML = '';
-        dataList.forEach(item => {
-            const arrA = getArr(item);
-            const aTags = arrA.map(n => `A-${String(n).padStart(2, '0')}`).join(' | ');
-            const bTag = `B-${String(item.blue).padStart(2, '0')}`;
-            
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td style="color:var(--text-reg);">${item.code}</td>
-                <td>${item.date}</td>
-                <td><strong style="color:var(--accent);">${aTags}</strong></td>
-                <td><strong style="color:var(--warning);">${bTag}</strong></td>
-            `;
-            tbody.appendChild(tr);
-        });
-    }
-
-    function generateOneTicket(useProb, history) {
-        let poolA = [];
+    // 生成一注号码
+    function generateOneTicket(useProb) {
+        let poolRed = [];
         for (let i = 1; i <= 33; i++) {
-            poolA.push({ num: i, weight: useProb ? getWeight(i, 'main', history) : 1.0 });
+            poolRed.push({ num: i, weight: useProb ? getWeight(i, 'red', latestHistory) : 1.0 });
         }
-        let picksA = [];
+        let reds = [];
         for (let k = 0; k < 6; k++) {
-            let totalWeight = poolA.reduce((sum, item) => sum + item.weight, 0);
-            if (totalWeight === 0) { poolA.forEach(item => item.weight = 1.0); totalWeight = poolA.length; }
-            let rand = Math.random() * totalWeight;
+            let totalW = poolRed.reduce((sum, item) => sum + item.weight, 0);
+            if (totalW === 0) { poolRed.forEach(item => item.weight = 1); totalW = poolRed.length; }
+            let rand = Math.random() * totalW;
             let idx = -1;
-            for (let j = 0; j < poolA.length; j++) {
-                rand -= poolA[j].weight;
+            for (let j = 0; j < poolRed.length; j++) {
+                rand -= poolRed[j].weight;
                 if (rand <= 0) { idx = j; break; }
             }
-            if (idx === -1) idx = poolA.length - 1;
-            picksA.push(poolA[idx].num);
-            poolA.splice(idx, 1); 
+            if (idx === -1) idx = poolRed.length - 1;
+            reds.push(poolRed[idx].num);
+            poolRed.splice(idx, 1);
         }
-        picksA.sort((a, b) => a - b);
+        reds.sort((a,b) => a-b);
 
-        let poolB = [];
+        let poolBlue = [];
         for (let i = 1; i <= 16; i++) {
-            poolB.push({ num: i, weight: useProb ? getWeight(i, 'sub', history) : 1.0 });
+            poolBlue.push({ num: i, weight: useProb ? getWeight(i, 'blue', latestHistory) : 1.0 });
         }
-        let totalWeightB = poolB.reduce((sum, item) => sum + item.weight, 0);
-        if (totalWeightB === 0) { poolB.forEach(item => item.weight = 1.0); totalWeightB = poolB.length; }
-        
-        let randB = Math.random() * totalWeightB;
-        let pickB = 1;
-        for (let j = 0; j < poolB.length; j++) {
-            randB -= poolB[j].weight;
-            if (randB <= 0) { pickB = poolB[j].num; break; }
+        let totalB = poolBlue.reduce((sum, item) => sum + item.weight, 0);
+        if (totalB === 0) { poolBlue.forEach(item => item.weight = 1); totalB = poolBlue.length; }
+        let randB = Math.random() * totalB;
+        let blue = 1;
+        for (let j = 0; j < poolBlue.length; j++) {
+            randB -= poolBlue[j].weight;
+            if (randB <= 0) { blue = poolBlue[j].num; break; }
         }
 
-        return { reds: picksA, blue: pickB };
+        return { red: reds, blue: blue };
     }
 
-    function generateNewTickets() {
-        if (latestHistory.length === 0) {
-            alert("数据流尚未就绪，请稍候...");
-            return;
-        }
+    // 点击机选
+    function generate(count) {
+        if (latestHistory.length === 0) { showToast("数据加载中，请稍候"); return; }
+        
         const useProb = document.getElementById('probSwitch').checked;
-        const count = parseInt(document.getElementById('pickCount').value);
-        
-        currentTickets = []; 
-        for (let i = 0; i < count; i++) {
-            currentTickets.push(generateOneTicket(useProb, latestHistory));
-        }
-        
-        renderCurrentTickets(useProb); 
-        document.getElementById('resultBox').style.display = 'block';
-    }
-
-    // 渲染为仓库货架编号
-    function renderCurrentTickets(useProb) {
-        const displayDiv = document.getElementById('pickDisplay');
-        const modeInfo = document.getElementById('modeInfo');
+        let displayDiv = document.getElementById('pickDisplay');
         displayDiv.innerHTML = '';
+        document.getElementById('resultBox').style.display = 'block';
 
-        currentTickets.forEach(ticket => {
-            // 生成 A-XX 和 B-XX 标签
-            const tagsA = ticket.reds.map(n => `<span class="shelf-tag">A-${String(n).padStart(2, '0')}</span>`).join('');
-            const tagB = `<span class="shelf-tag b-zone">B-${String(ticket.blue).padStart(2, '0')}</span>`;
+        for (let i = 0; i < count; i++) {
+            let ticket = generateOneTicket(useProb);
+            let isSaved = myWatchlist.some(w => w.red.join() === ticket.red.join() && w.blue === ticket.blue);
             
-            const isSaved = myFollows.some(f => JSON.stringify(f) === JSON.stringify(ticket));
+            let redHtml = ticket.red.map(n => `<span class="ball red">${String(n).padStart(2,'0')}</span>`).join('');
+            let blueHtml = `<span class="ball blue">${String(ticket.blue).padStart(2,'0')}</span>`;
 
-            const row = document.createElement('div');
-            row.className = 'pick-row';
-            row.innerHTML = `
-                <div>
-                    <span style="font-size:12px; color:var(--text-reg); margin-right:10px;">[拣货路径]</span>
-                    ${tagsA} 
-                    <span style="color:var(--border); margin:0 5px;">➔</span> 
-                    ${tagB}
-                </div>
-                <div class="action-group">
-                    <button class="mini-btn" onclick='copyTicket(${JSON.stringify(ticket)})'>[ 复制单号 ]</button>
-                    <button class="mini-btn" onclick='saveToFollow(${JSON.stringify(ticket)})' ${isSaved ? 'disabled' : ''}>
-                        ${isSaved ? '[ 已跟进 ]' : '[ 标记异常 ]'}
-                    </button>
+            displayDiv.innerHTML += `
+                <div class="result-item">
+                    <div class="ball-group">${redHtml}<span class="ball plus">+</span>${blueHtml}</div>
+                    <div class="action-btns">
+                        <button class="btn-small btn-copy" onclick='copyTicket(${JSON.stringify(ticket)})'>复制</button>
+                        <button class="btn-small btn-save" onclick='saveWatch(${JSON.stringify(ticket)})' ${isSaved ? 'disabled' : ''}>
+                            ${isSaved ? '已追号' : '⭐ 追号'}
+                        </button>
+                    </div>
                 </div>
             `;
-            displayDiv.appendChild(row);
-        });
-
-        modeInfo.innerText = useProb 
-            ? "当前策略: 防重过滤已激活" 
-            : "当前策略: 完全随机分配";
+        }
     }
 
+    // 复制号码
     function copyTicket(ticket) {
-        // 复制出来也是带货架号的格式
-        const arrAStr = ticket.reds.map(n => `A-${String(n).padStart(2, '0')}`).join(', ');
-        const bStr = `B-${String(ticket.blue).padStart(2, '0')}`;
-        const textToCopy = `${arrAStr}, ${bStr}`;
+        let text = ticket.red.map(n => String(n).padStart(2,'0')).join(' ') + ' + ' + String(ticket.blue).padStart(2,'0');
+        navigator.clipboard.writeText(text).then(() => { showToast("号码已复制"); });
+    }
+
+    // 保存追号
+    function saveWatch(ticket) {
+        if (myWatchlist.length >= 3) { showToast("最多只能追号 3 注！"); return; }
+        if (myWatchlist.some(w => w.red.join() === ticket.red.join() && w.blue === ticket.blue)) return;
         
-        navigator.clipboard.writeText(textToCopy).then(() => {
-            showToast("拣货单已复制");
-        }).catch(err => {
-            const textArea = document.createElement("textarea");
-            textArea.value = textToCopy;
-            document.body.appendChild(textArea);
-            textArea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textArea);
-            showToast("拣货单已复制");
+        myWatchlist.push(ticket);
+        localStorage.setItem('ssq_watchlist', JSON.stringify(myWatchlist));
+        renderWatchlist();
+        generate(document.querySelectorAll('.result-item').length); // 刷新按钮状态
+        showToast("追号成功");
+    }
+
+    // 移除追号
+    function removeWatch(index) {
+        myWatchlist.splice(index, 1);
+        localStorage.setItem('ssq_watchlist', JSON.stringify(myWatchlist));
+        renderWatchlist();
+        if(document.getElementById('resultBox').style.display === 'block') {
+            generate(document.querySelectorAll('.result-item').length);
+        }
+    }
+
+    // 渲染追号列表
+    function renderWatchlist() {
+        let box = document.getElementById('watchBox');
+        let display = document.getElementById('watchListDisplay');
+        if (myWatchlist.length === 0) { box.style.display = 'none'; return; }
+        
+        box.style.display = 'block';
+        display.innerHTML = '';
+        myWatchlist.forEach((ticket, index) => {
+            let redHtml = ticket.red.map(n => `<span class="ball red" style="width:28px;height:28px;font-size:14px;">${String(n).padStart(2,'0')}</span>`).join('');
+            let blueHtml = `<span class="ball blue" style="width:28px;height:28px;font-size:14px;">${String(ticket.blue).padStart(2,'0')}</span>`;
+            display.innerHTML += `
+                <div class="watch-item">
+                    <div class="ball-group">${redHtml}<span class="ball plus">+</span>${blueHtml}</div>
+                    <button class="btn-del" onclick="removeWatch(${index})">×</button>
+                </div>
+            `;
         });
+    }
+
+    // 判定奖级
+    function getPrizeLevel(redHit, blueHit) {
+        if (redHit === 6 && blueHit === 1) return { level: '一等奖', money: '浮动(500万起)' };
+        if (redHit === 6 && blueHit === 0) return { level: '二等奖', money: '浮动' };
+        if (redHit === 5 && blueHit === 1) return { level: '三等奖', money: '3000元' };
+        if ((redHit === 5 && blueHit === 0) || (redHit === 4 && blueHit === 1)) return { level: '四等奖', money: '200元' };
+        if ((redHit === 4 && blueHit === 0) || (redHit === 3 && blueHit === 1)) return { level: '五等奖', money: '10元' };
+        if (blueHit === 1 || (redHit === 2 && blueHit === 1) || (redHit === 1 && blueHit === 1)) return { level: '六等奖', money: '5元' };
+        return null;
+    }
+
+    // 执行比对
+    function checkPrize(isAuto = false) {
+        if (!currentDraw || myWatchlist.length === 0) return;
+        
+        let drawRed = currentDraw.red;
+        let drawBlue = currentDraw.blue;
+        let hasWin = false;
+        let bodyHtml = `<div style="font-size:13px;color:#666;margin-bottom:15px;">第 <b>${currentDraw.code}</b> 期开奖：<br><span style="color:#e53935;font-weight:bold;">${drawRed.join(' ')}</span> <span style="color:#1e88e5;font-weight:bold;">+ ${drawBlue}</span></div>`;
+
+        myWatchlist.forEach((ticket, index) => {
+            let hitRed = ticket.red.filter(n => drawRed.includes(n)).length;
+            let hitBlue = ticket.blue === drawBlue ? 1 : 0;
+            let prize = getPrizeLevel(hitRed, hitBlue);
+
+            if (prize) {
+                hasWin = true;
+                bodyHtml += `
+                    <div style="border-top:1px dashed #eee;padding-top:10px;margin-top:10px;text-align:left;">
+                        <span class="prize-level">🎉 第 ${index+1} 注：${prize.level} (${prize.money})</span>
+                        <div style="font-size:12px;color:#555;">命中红球 ${hitRed} 个，蓝球 ${hitBlue} 个</div>
+                    </div>
+                `;
+            } else if (!isAuto) {
+                bodyHtml += `
+                    <div style="border-top:1px dashed #eee;padding-top:10px;margin-top:10px;text-align:left;color:#999;">
+                        <span style="font-weight:bold;">第 ${index+1} 注：未中奖</span>
+                        <div style="font-size:12px;">命中红球 ${hitRed} 个，蓝球 ${hitBlue} 个</div>
+                    </div>
+                `;
+            }
+        });
+
+        if (hasWin) {
+            document.getElementById('modalTitle').innerText = "🎉 恭喜您中奖啦！";
+            document.getElementById('modalContentBox').classList.add('win-bg');
+            document.getElementById('modalBody').innerHTML = bodyHtml;
+            document.getElementById('modal').style.display = 'flex';
+        } else if (!isAuto) {
+            document.getElementById('modalTitle').innerText = "很遗憾，未中奖";
+            document.getElementById('modalContentBox').classList.remove('win-bg');
+            document.getElementById('modalBody').innerHTML = bodyHtml;
+            document.getElementById('modal').style.display = 'flex';
+        }
+    }
+
+    function closeModal() {
+        document.getElementById('modal').style.display = 'none';
     }
 
     function showToast(msg) {
-        const toast = document.getElementById('toast');
+        let toast = document.getElementById('toast');
         toast.innerText = msg;
         toast.style.display = 'block';
         setTimeout(() => { toast.style.display = 'none'; }, 2000);
     }
 
-    function saveToFollow(ticket) {
-        if (myFollows.length >= 3) {
-            alert("异常跟进队列已满 (Max 3)！");
-            return;
-        }
-        if (myFollows.some(f => JSON.stringify(f) === JSON.stringify(ticket))) return;
-
-        myFollows.push(ticket);
-        updateFollowStorage();
-        renderCurrentTickets(document.getElementById('probSwitch').checked); 
-    }
-
-    function deleteFollow(index) {
-        myFollows.splice(index, 1);
-        updateFollowStorage();
-        renderCurrentTickets(document.getElementById('probSwitch').checked); 
-    }
-
-    function clearFollow() {
-        if (confirm("确定清空跟进队列？")) {
-            myFollows = [];
-            updateFollowStorage();
-            renderCurrentTickets(document.getElementById('probSwitch').checked); 
-        }
-    }
-
-    function updateFollowStorage() {
-        localStorage.setItem('wms_follows', JSON.stringify(myFollows));
-        renderFollowList();
-    }
-
-    function renderFollowList() {
-        const followBox = document.getElementById('followBox');
-        const listDiv = document.getElementById('followList');
-        
-        if (myFollows.length === 0) {
-            followBox.style.display = 'none';
-            return;
-        }
-
-        followBox.style.display = 'block';
-        listDiv.innerHTML = '';
-
-        myFollows.forEach((ticket, index) => {
-            const arrAStr = ticket.reds.map(n => `A-${String(n).padStart(2, '0')}`).join(', ');
-            const bStr = `B-${String(ticket.blue).padStart(2, '0')}`;
-            
-            const div = document.createElement('div');
-            div.className = 'queue-item';
-            div.innerHTML = `
-                <div>[单号 ${index + 1}] ${arrAStr}, ${bStr}</div>
-                <button class="mini-btn" style="color:var(--danger); border-color:var(--danger);" onclick="deleteFollow(${index})">[ 移除 ]</button>
-            `;
-            listDiv.appendChild(div);
-        });
-    }
-
-    function openCompareModal() {
-        if (latestHistory.length === 0) {
-            alert("仓库数据尚未加载完毕。");
-            return;
-        }
-        if (myFollows.length === 0) {
-            alert("跟进队列为空，无需盘点。");
-            return;
-        }
-
-        const latestDraw = latestHistory[0];
-        const batchMain = getArr(latestDraw);
-        const batchSub = Number(latestDraw.blue);
-        
-        const modalBody = document.getElementById('modalBody');
-        
-        const targetA = batchMain.map(n => `A-${String(n).padStart(2, '0')}`).join(', ');
-        const targetB = `B-${String(batchSub).padStart(2, '0')}`;
-
-        let html = `
-            <div style="margin-bottom: 20px; font-family: var(--font-mono); font-size:13px; background:#f8fafc; padding:10px; border:1px solid var(--border);">
-                <strong>盘点基准单号:</strong> ${latestDraw.code}<br>
-                <strong>实际出库记录:</strong> [ ${targetA} ] + ${targetB}
-            </div>
-        `;
-
-        myFollows.forEach((ticket, index) => {
-            let hitA = 0;
-            ticket.reds.forEach(num => {
-                if (batchMain.includes(num)) hitA++;
-            });
-            const hitB = ticket.blue === batchSub ? 1 : 0;
-            
-            const isHighMatch = hitA >= 3 || hitB === 1;
-            const statusText = isHighMatch 
-                ? `<span class="match-high">[异常] 高度重合</span>` 
-                : `<span class="match-normal">[正常] 无冲突</span>`;
-            
-            const arrAStr = ticket.reds.map(n => `A-${String(n).padStart(2, '0')}`).join(', ');
-            const bStr = `B-${String(ticket.blue).padStart(2, '0')}`;
-
-            html += `
-                <div class="report-box">
-                    <div class="report-header">
-                        <span>异常跟进单 0${index + 1}</span>
-                        ${statusText}
-                    </div>
-                    <div class="report-content">
-                        <div style="margin-bottom: 10px; color:var(--text-reg); font-size:12px;">原跟进明细: ${arrAStr}, ${bStr}</div>
-                        <div style="font-weight:bold;">
-                            碰撞命中: A区 <span style="color:var(--danger);">${hitA}</span> 件 | B区 <span style="color:var(--danger);">${hitB}</span> 件
-                        </div>
-                    </div>
-                </div>
-            `;
-        });
-
-        modalBody.innerHTML = html;
-        document.getElementById('compareModal').style.display = 'flex';
-    }
-
-    function closeCompareModal() {
-        document.getElementById('compareModal').style.display = 'none';
-    }
-
-    window.onload = function() {
-        fetchData();
-        renderFollowList();
-    };
+    window.onload = init;
 </script>
-
 </body>
 </html>
