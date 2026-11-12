@@ -70,6 +70,11 @@
         .btn-manual { background: #fff; color: #ffb300; border: 1px solid #ffb300; padding: 4px 10px; border-radius: 6px; font-size: 13px; cursor: pointer; transition: 0.2s;}
         .btn-manual:hover { background: #ffb300; color: white; }
         .watch-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        
+        /* 新增状态标签 */
+        .status-tag { font-size: 11px; padding: 2px 6px; border-radius: 4px; margin-left: 5px; vertical-align: middle;}
+        .status-wait { background: #e3f2fd; color: #1e88e5; }
+        
         .btn-del { color: #999; background: none; border: none; font-size: 20px; cursor: pointer; }
 
         /* 历史记录区 */
@@ -202,6 +207,13 @@
     let currentDraw = null; 
 
     async function init() {
+        // 兼容旧数据：如果没有记录目标期号，补一个
+        myWatchlist.forEach(ticket => {
+            if (!ticket.issueWhenAdded) {
+                ticket.issueWhenAdded = "0"; // 0 代表老数据，默认已经开过奖，可以比对
+            }
+        });
+
         renderWatchlist();
         try {
             const res = await fetch(`${DATA_URL}?t=${Date.now()}`);
@@ -215,7 +227,9 @@
                 document.getElementById('status').style.color = "#10b981";
                 renderHistory(latestHistory);
 
-                if (myWatchlist.length > 0) {
+                // 只有存在符合条件（期号小于当前期）的追号，才自动比对
+                let hasComparable = myWatchlist.some(t => t.issueWhenAdded !== currentDraw.code);
+                if (myWatchlist.length > 0 && hasComparable) {
                     setTimeout(() => { checkPrize(true); }, 800);
                 }
             }
@@ -333,23 +347,23 @@
         navigator.clipboard.writeText(text).then(() => { showToast("号码已复制"); });
     }
 
-    // 核心保存逻辑，上限改为 5
     function saveWatch(ticket) {
         if (myWatchlist.length >= 5) { showToast("最多只能追号 5 注！"); return; }
         if (myWatchlist.some(w => w.red.join() === ticket.red.join() && w.blue === ticket.blue)) {
             showToast("这注号码已经在追号列表里了"); return;
         }
         
+        // 核心改动：记录当前期号，代表这注追号的目标期号是下一期
+        ticket.issueWhenAdded = currentDraw ? currentDraw.code : "0";
+        
         myWatchlist.push(ticket);
         localStorage.setItem('ssq_watchlist', JSON.stringify(myWatchlist));
         renderWatchlist();
         
-        // 如果当前有显示的机选结果，刷新一下按钮状态
         if(document.getElementById('resultBox').style.display === 'block') {
             generate(document.querySelectorAll('.result-item').length);
         }
-        
-        showToast("追号成功");
+        showToast("追号成功，等待下一期开奖");
     }
 
     function removeWatch(index) {
@@ -365,7 +379,6 @@
         let box = document.getElementById('watchBox');
         let display = document.getElementById('watchListDisplay');
         
-        // 就算没有追号，也要显示 box，因为有手动添加按钮
         box.style.display = 'block'; 
         display.innerHTML = '';
         
@@ -377,9 +390,19 @@
         myWatchlist.forEach((ticket, index) => {
             let redHtml = ticket.red.map(n => `<span class="ball red" style="width:28px;height:28px;font-size:14px;">${String(n).padStart(2,'0')}</span>`).join('');
             let blueHtml = `<span class="ball blue" style="width:28px;height:28px;font-size:14px;">${String(ticket.blue).padStart(2,'0')}</span>`;
+            
+            // 判断状态标签
+            let statusTag = "";
+            if (currentDraw && ticket.issueWhenAdded === currentDraw.code) {
+                statusTag = `<span class="status-tag status-wait">等待下期开奖</span>`;
+            }
+
             display.innerHTML += `
                 <div class="watch-item">
-                    <div class="ball-group">${redHtml}<span class="ball plus">+</span>${blueHtml}</div>
+                    <div class="ball-group">
+                        ${redHtml}<span class="ball plus">+</span>${blueHtml}
+                        ${statusTag}
+                    </div>
                     <button class="btn-del" onclick="removeWatch(${index})">×</button>
                 </div>
             `;
@@ -403,12 +426,27 @@
         let drawRed = currentDraw.red;
         let drawBlue = currentDraw.blue;
         let hasWin = false;
+        let hasComparable = false;
         
         let bodyHtml = `<div style="font-size:13px;color:#666;margin-bottom:15px;text-align:center;">第 <b>${currentDraw.code}</b> 期开奖：<br>
                         <span style="color:#e53935;font-weight:bold;">${drawRed.map(n=>String(n).padStart(2,'0')).join(' ')}</span> 
                         <span style="color:#1e88e5;font-weight:bold;">+ ${String(drawBlue).padStart(2,'0')}</span></div>`;
 
         myWatchlist.forEach((ticket, index) => {
+            // 核心校验：如果这注追号的期号和最新开奖期号一样，说明还没到开奖时间
+            if (ticket.issueWhenAdded === currentDraw.code) {
+                if (!isAuto) {
+                    bodyHtml += `
+                        <div style="border-top:1px dashed #ccc;padding-top:10px;margin-top:10px;color:#1e88e5;">
+                            <span style="font-weight:bold;">第 ${index+1} 注：等待开奖</span>
+                            <div style="font-size:12px;">该注是第 ${ticket.issueWhenAdded} 期开奖后添加的，将参与下一期开奖。</div>
+                        </div>
+                    `;
+                }
+                return; // 跳过此注，不参与比对
+            }
+
+            hasComparable = true;
             let hitRed = ticket.red.filter(n => drawRed.includes(n)).length;
             let hitBlue = ticket.blue === drawBlue ? 1 : 0;
             let prize = getPrizeLevel(hitRed, hitBlue);
@@ -436,10 +474,16 @@
             document.getElementById('modalContentBox').classList.add('win-bg');
             document.getElementById('modalBody').innerHTML = bodyHtml;
             document.getElementById('modal').style.display = 'flex';
-        } else if (!isAuto) {
-            document.getElementById('modalTitle').innerText = "很遗憾，未中奖";
+        } else if (!isAuto && hasComparable) {
+            document.getElementById('modalTitle').innerText = "开奖比对结果";
             document.getElementById('modalContentBox').classList.remove('win-bg');
             document.getElementById('modalBody').innerHTML = bodyHtml;
+            document.getElementById('modal').style.display = 'flex';
+        } else if (!isAuto && !hasComparable) {
+            // 如果所有的追号都在等待下期开奖
+            document.getElementById('modalTitle').innerText = "暂时无法比对";
+            document.getElementById('modalContentBox').classList.remove('win-bg');
+            document.getElementById('modalBody').innerHTML = bodyHtml + `<div style="text-align:center;color:#999;margin-top:20px;">目前所有的追号都在等待下一期开奖，请耐心等待哦。</div>`;
             document.getElementById('modal').style.display = 'flex';
         }
     }
@@ -455,13 +499,11 @@
         setTimeout(() => { toast.style.display = 'none'; }, 2000);
     }
 
-    // ================= 手动输入相关逻辑 =================
     function openManualInput() {
         if (myWatchlist.length >= 5) {
             showToast("追号已满 5 注，无法继续添加！");
             return;
         }
-        // 清空输入框
         for(let i=1; i<=6; i++) document.getElementById(`r${i}`).value = '';
         document.getElementById('b1').value = '';
         
@@ -474,7 +516,6 @@
 
     function saveManualTicket() {
         let reds = [];
-        // 获取红球
         for(let i=1; i<=6; i++) {
             let val = parseInt(document.getElementById(`r${i}`).value);
             if (isNaN(val) || val < 1 || val > 33) {
@@ -488,30 +529,29 @@
             reds.push(val);
         }
         
-        // 获取蓝球
         let blueVal = parseInt(document.getElementById('b1').value);
         if (isNaN(blueVal) || blueVal < 1 || blueVal > 16) {
             showToast(`蓝球输入无效 (需在 01-16 之间)`);
             return;
         }
 
-        // 排序
         reds.sort((a,b) => a-b);
 
         let ticket = { red: reds, blue: blueVal };
         
-        // 检查是否重复
         if (myWatchlist.some(w => w.red.join() === ticket.red.join() && w.blue === ticket.blue)) {
             showToast("这注号码已经在追号列表里了");
             return;
         }
 
-        // 存入
+        // 核心改动：记录当前期号
+        ticket.issueWhenAdded = currentDraw ? currentDraw.code : "0";
+
         myWatchlist.push(ticket);
         localStorage.setItem('ssq_watchlist', JSON.stringify(myWatchlist));
         renderWatchlist();
         closeManualInput();
-        showToast("手动添加成功！");
+        showToast("添加成功，等待下期开奖");
     }
 
     window.onload = init;
