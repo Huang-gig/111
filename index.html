@@ -200,12 +200,13 @@
 </div>
 
 <script>
-    // 数据源1：主接口，单期最新数据（更新极快）
+    // 数据源1：主接口，单期最新数据
     const API_1 = 'https://cn.apihz.cn/api/caipiao/shuangseqiu.php?id=88888888&key=88888888';
     // 数据源2：备用接口，历史10期数据
     const b64Url = "aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL3dhbmdkYW9kYW8vRG91YmxlQ29sb3JCYWxsL21haW4vZGF0YS8yMDI2Lmpzb24=";
     const API_2 = atob(b64Url); 
-    // 数据源3：终极兜底数据（包含昨晚刚开奖的130期）
+
+    // 初始本地兜底数据（已更新至昨晚的 130 期）
     const fallbackData = [
         { code: "2026130", date: "2026-11-12", red: [1, 2, 6, 16, 20, 28], blue: 2 },
         { code: "2026129", date: "2026-11-10", red: [3, 9, 16, 20, 25, 30], blue: 5 },
@@ -230,54 +231,52 @@
         });
         renderWatchlist();
 
-        let newestDraw = null;
-        let historyList = [];
+        // 1. 直接先用本地兜底数据初始化（保证开局就显示 130 期）
+        let finalHistory = [...fallbackData];
 
-        // 1. 尝试从主接口拉取最新一期（极快）
+        // 2. 尝试拉取备用接口（获取历史10期）
         try {
-            const res1 = await fetch(API_1);
+            const res2 = await fetch(`${API_2}?t=${Date.now()}`, { cache: 'no-store' });
+            const yearData = await res2.json();
+            if (yearData && yearData.data) {
+                let rawList = yearData.data.slice(-10).reverse().map(item => ({
+                    code: item.code,
+                    date: item.date,
+                    red: typeof item.red === 'string' ? item.red.split(/[,\s]+/).map(Number) : item.red,
+                    blue: Number(item.blue)
+                }));
+                
+                // 如果接口有更新的数据，合并进去
+                rawList.forEach(item => {
+                    if (!finalHistory.some(h => h.code === item.code)) {
+                        finalHistory.push(item);
+                    }
+                });
+            }
+        } catch(e) { console.log("备用接口拉取失败"); }
+
+        // 3. 尝试从主接口拉取最新一期（极快）
+        try {
+            const res1 = await fetch(API_1, { cache: 'no-store' });
             const json1 = await res1.json();
             if (json1.code === 200 && json1.data) {
                 let data = json1.data;
-                newestDraw = {
+                let newDraw = {
                     code: data.qihao,
                     date: data.time.split(' ')[0],
                     red: data.number.split(/[|,]/).map(Number),
                     blue: Number(data.number1)
                 };
+                // 将新数据去重后加入
+                finalHistory = finalHistory.filter(item => item.code !== newDraw.code);
+                finalHistory.push(newDraw);
             }
         } catch(e) { console.log("主接口拉取失败"); }
 
-        // 2. 尝试获取历史10期（优先 GitHub 备选，失败则用兜底）
-        try {
-            const res2 = await fetch(`${API_2}?t=${Date.now()}`);
-            const yearData = await res2.json();
-            let rawList = yearData.data.slice(-10).reverse();
-            historyList = rawList.map(item => ({
-                code: item.code,
-                date: item.date,
-                red: typeof item.red === 'string' ? item.red.split(/[,\s]+/).map(Number) : item.red,
-                blue: Number(item.blue)
-            }));
-        } catch(e) { 
-            console.log("备用接口拉取失败，使用兜底");
-            historyList = [...fallbackData];
-        }
+        // 4. 按时间从新到旧排序
+        finalHistory.sort((a, b) => parseInt(b.code) - parseInt(a.code));
 
-        // 3. 数据合并去重处理：确保最新一期一定在最前面
-        if (newestDraw) {
-            // 如果历史列表最前面不是最新一期，强行插进去
-            if (historyList.length === 0 || historyList[0].code !== newestDraw.code) {
-                // 过滤掉列表中可能存在的旧数据
-                historyList = historyList.filter(item => item.code !== newestDraw.code);
-                historyList.unshift(newestDraw);
-            }
-        } else if (historyList.length === 0) {
-            // 如果两个接口全挂了，全用本地兜底
-            historyList = [...fallbackData];
-        }
-
-        latestHistory = historyList.slice(0, 10);
+        latestHistory = finalHistory.slice(0, 10);
         
         if (latestHistory.length > 0) {
             currentDraw = latestHistory[0];
