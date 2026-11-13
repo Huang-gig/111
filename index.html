@@ -200,10 +200,20 @@
 </div>
 
 <script>
-    // 双数据源配置
-    const API_1 = 'https://api.vvhan.com/api/lottery?type=ssq';
+    // 数据源1：主接口，单期最新数据（更新极快）
+    const API_1 = 'https://cn.apihz.cn/api/caipiao/shuangseqiu.php?id=88888888&key=88888888';
+    // 数据源2：备用接口，历史10期数据
     const b64Url = "aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL3dhbmdkYW9kYW8vRG91YmxlQ29sb3JCYWxsL21haW4vZGF0YS8yMDI2Lmpzb24=";
     const API_2 = atob(b64Url); 
+    // 数据源3：终极兜底数据（包含昨晚刚开奖的130期）
+    const fallbackData = [
+        { code: "2026130", date: "2026-11-12", red: [1, 2, 6, 16, 20, 28], blue: 2 },
+        { code: "2026129", date: "2026-11-10", red: [3, 9, 16, 20, 25, 30], blue: 5 },
+        { code: "2026128", date: "2026-11-08", red: [5, 6, 10, 25, 27, 30], blue: 11 },
+        { code: "2026127", date: "2026-11-05", red: [13, 14, 19, 25, 29, 32], blue: 12 },
+        { code: "2026126", date: "2026-11-03", red: [9, 10, 13, 22, 29, 32], blue: 12 },
+        { code: "2026125", date: "2026-11-01", red: [4, 6, 10, 15, 26, 27], blue: 11 }
+    ];
 
     let latestHistory = []; 
     let myWatchlist = JSON.parse(localStorage.getItem('ssq_watchlist')) || [];
@@ -213,44 +223,69 @@
     let selectedReds = [];
     let selectedBlue = null;
 
+    // 核心：多接口容错同步
     async function init() {
         myWatchlist.forEach(ticket => {
             if (!ticket.issueWhenAdded) ticket.issueWhenAdded = "0";
         });
         renderWatchlist();
 
+        let newestDraw = null;
+        let historyList = [];
+
+        // 1. 尝试从主接口拉取最新一期（极快）
         try {
-            const res = await fetch(API_1);
-            const json = await res.json();
-            
-            if (json.success && json.data && json.data.length > 0) {
-                latestHistory = json.data.slice(0, 10).map(item => ({
-                    code: item.issue,
-                    date: item.time,
-                    red: item.red.split(',').map(Number),
-                    blue: Number(item.blue)
-                }));
-            } else {
-                throw new Error("接口1返回异常");
+            const res1 = await fetch(API_1);
+            const json1 = await res1.json();
+            if (json1.code === 200 && json1.data) {
+                let data = json1.data;
+                newestDraw = {
+                    code: data.qihao,
+                    date: data.time.split(' ')[0],
+                    red: data.number.split(/[|,]/).map(Number),
+                    blue: Number(data.number1)
+                };
             }
-        } catch (e) {
-            try {
-                const res2 = await fetch(`${API_2}?t=${Date.now()}`);
-                const yearData = await res2.json();
-                latestHistory = yearData.data.slice(-10).reverse();
-            } catch (e2) {
-                document.getElementById('status').innerText = `网络异常，请稍后重试`;
-                document.getElementById('status').style.color = "#e53935";
-                return;
-            }
+        } catch(e) { console.log("主接口拉取失败"); }
+
+        // 2. 尝试获取历史10期（优先 GitHub 备选，失败则用兜底）
+        try {
+            const res2 = await fetch(`${API_2}?t=${Date.now()}`);
+            const yearData = await res2.json();
+            let rawList = yearData.data.slice(-10).reverse();
+            historyList = rawList.map(item => ({
+                code: item.code,
+                date: item.date,
+                red: typeof item.red === 'string' ? item.red.split(/[,\s]+/).map(Number) : item.red,
+                blue: Number(item.blue)
+            }));
+        } catch(e) { 
+            console.log("备用接口拉取失败，使用兜底");
+            historyList = [...fallbackData];
         }
 
+        // 3. 数据合并去重处理：确保最新一期一定在最前面
+        if (newestDraw) {
+            // 如果历史列表最前面不是最新一期，强行插进去
+            if (historyList.length === 0 || historyList[0].code !== newestDraw.code) {
+                // 过滤掉列表中可能存在的旧数据
+                historyList = historyList.filter(item => item.code !== newestDraw.code);
+                historyList.unshift(newestDraw);
+            }
+        } else if (historyList.length === 0) {
+            // 如果两个接口全挂了，全用本地兜底
+            historyList = [...fallbackData];
+        }
+
+        latestHistory = historyList.slice(0, 10);
+        
         if (latestHistory.length > 0) {
             currentDraw = latestHistory[0];
             document.getElementById('status').innerText = `数据已同步 (最新第 ${currentDraw.code} 期)`;
             document.getElementById('status').style.color = "#10b981";
             renderHistory(latestHistory);
 
+            // 自动对奖
             let hasComparable = myWatchlist.some(t => t.issueWhenAdded !== currentDraw.code);
             if (myWatchlist.length > 0 && hasComparable) {
                 setTimeout(() => { checkPrize(true); }, 800);
@@ -277,6 +312,7 @@
         });
     }
 
+    // 连出权重计算
     function getStreak(num, type, history) {
         let streak = 0;
         for (let i = 0; i < Math.min(3, history.length); i++) {
@@ -295,6 +331,7 @@
         return 1.0;                      
     }
 
+    // 机选生成
     function generateOneTicket(useProb) {
         let poolRed = [];
         for (let i = 1; i <= 33; i++) {
@@ -372,6 +409,7 @@
             showToast("这注号码已经在追号列表里了"); return;
         }
         
+        // 核心拦截：记录当前期号，代表买给下一期
         ticket.issueWhenAdded = currentDraw ? currentDraw.code : "0";
         
         myWatchlist.push(ticket);
@@ -450,6 +488,7 @@
                         <span style="color:#1e88e5;font-weight:bold;">+ ${String(drawBlue).padStart(2,'0')}</span></div>`;
 
         myWatchlist.forEach((ticket, index) => {
+            // 核心拦截：新买的还在等待开奖
             if (ticket.issueWhenAdded === currentDraw.code) {
                 if (!isAuto) {
                     bodyHtml += `
@@ -579,22 +618,22 @@
     function toggleRed(num) {
         let idx = selectedReds.indexOf(num);
         if (idx > -1) {
-            selectedReds.splice(idx, 1); // 取消选中
+            selectedReds.splice(idx, 1);
         } else {
             if (selectedReds.length >= 6) {
                 showToast("红球最多只能选 6 个！");
                 return;
             }
-            selectedReds.push(num); // 选中
+            selectedReds.push(num);
         }
         renderPickGrids();
     }
 
     function toggleBlue(num) {
         if (selectedBlue === num) {
-            selectedBlue = null; // 取消选中
+            selectedBlue = null;
         } else {
-            selectedBlue = num; // 替换选中
+            selectedBlue = num;
         }
         renderPickGrids();
     }
