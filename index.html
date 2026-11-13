@@ -63,11 +63,15 @@
         .hot-cold-card { background: var(--card-bg); border-radius: 16px; padding: 15px 20px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
         .hc-title { font-size: 14px; font-weight: bold; margin-bottom: 10px; display: flex; justify-content: space-between;}
         .hc-row { display: flex; align-items: center; margin-bottom: 8px; font-size: 13px;}
-        .hc-label { width: 50px; font-weight: bold;}
+        .hc-label { width: 60px; font-weight: bold;}
         .hc-balls { display: flex; gap: 5px; flex-wrap: wrap;}
         .hc-ball { padding: 2px 8px; border-radius: 4px; font-family: monospace; font-weight: bold;}
         .hc-hot { background: #ffebee; color: #e53935; border: 1px solid #ffcdd2;}
         .hc-cold { background: #e3f2fd; color: #1e88e5; border: 1px solid #bbdefb;}
+        
+        /* 蓝球冷热样式 */
+        .hc-hot-blue { background: #e3f2fd; color: #1e88e5; border: 1px solid #90caf9;}
+        .hc-cold-blue { background: #e0f7fa; color: #00bcd4; border: 1px solid #80deea;}
 
         .result-card { background: var(--card-bg); border-radius: 16px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px; display: none; border-top: 5px solid var(--red-color); }
         .result-item { display: flex; flex-direction: column; padding: 12px 0; border-bottom: 1px dashed #eee; }
@@ -141,7 +145,6 @@
 
         .grid-container { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-bottom: 15px; }
         
-        /* 🌟 优化：加强按下去的缩放和阴影变化 */
         .num-btn { width: 100%; aspect-ratio: 1; border-radius: 50%; border: 1px solid #e0e0e0; background: #f8f9fa; color: #333; font-size: 16px; font-weight: bold; display: flex; justify-content: center; align-items: center; cursor: pointer; transition: all 0.1s; user-select: none; position: relative;}
         .num-btn:active { transform: scale(0.85); box-shadow: 0 0 10px rgba(0,0,0,0.1); }
         
@@ -232,13 +235,23 @@
             <span>近10期走势分析</span>
             <span style="font-size: 12px; color: #999; font-weight: normal;">仅做参考</span>
         </div>
+        <!-- 红球冷热 -->
         <div class="hc-row">
-            <div class="hc-label" style="color: #e53935;">🔥 热号</div>
+            <div class="hc-label" style="color: #e53935;">🔥 红热</div>
             <div class="hc-balls" id="hotRedList"></div>
         </div>
         <div class="hc-row">
-            <div class="hc-label" style="color: #1e88e5;">❄️ 冷号</div>
+            <div class="hc-label" style="color: #1e88e5;">❄️ 红冷</div>
             <div class="hc-balls" id="coldRedList"></div>
+        </div>
+        <!-- 蓝球冷热 -->
+        <div class="hc-row" style="margin-top: 10px; border-top: 1px dashed #eee; padding-top: 10px;">
+            <div class="hc-label" style="color: #1e88e5;">🔥 蓝热</div>
+            <div class="hc-balls" id="hotBlueList"></div>
+        </div>
+        <div class="hc-row">
+            <div class="hc-label" style="color: #00bcd4;">❄️ 蓝冷</div>
+            <div class="hc-balls" id="coldBlueList"></div>
         </div>
     </div>
 
@@ -324,6 +337,8 @@
 
     let hotReds = [];
     let coldReds = [];
+    let hotBlues = []; 
+    let coldBlues = []; 
     
     let isHistoryExpanded = false;
 
@@ -431,21 +446,33 @@
         renderHistory();
     }
 
+    // 🌟 核心修复：按次数动态判定，不再写死截断
     function analyzeHotCold() {
         let redCounts = {};
+        let blueCounts = {};
         for(let i=1; i<=33; i++) redCounts[i] = 0;
+        for(let i=1; i<=16; i++) blueCounts[i] = 0;
         
         latestHistory.forEach(item => {
             item.red.forEach(n => redCounts[n]++);
+            blueCounts[item.blue]++;
         });
 
+        // 红球统计：出现 >= 2次的为热号（最多取前6个防撑爆），没出现的为冷号（最多取前6个）
         let sortedReds = Object.keys(redCounts).map(Number).sort((a,b) => redCounts[b] - redCounts[a]);
-        
-        hotReds = sortedReds.slice(0, 4).filter(n => redCounts[n] > 0);
+        hotReds = sortedReds.filter(n => redCounts[n] >= 2).slice(0, 6); 
         coldReds = sortedReds.filter(n => redCounts[n] === 0).slice(0, 6);
 
         document.getElementById('hotRedList').innerHTML = hotReds.map(n => `<span class="hc-ball hc-hot">${String(n).padStart(2,'0')} (${redCounts[n]}次)</span>`).join('');
         document.getElementById('coldRedList').innerHTML = coldReds.map(n => `<span class="hc-ball hc-cold">${String(n).padStart(2,'0')}</span>`).join('');
+
+        // 蓝球统计：出现 >= 2次的为热号（最多取前4个防撑爆），没出现的为冷号（最多取前5个）
+        let sortedBlues = Object.keys(blueCounts).map(Number).sort((a,b) => blueCounts[b] - blueCounts[a]);
+        hotBlues = sortedBlues.filter(n => blueCounts[n] >= 2).slice(0, 4); 
+        coldBlues = sortedBlues.filter(n => blueCounts[n] === 0).slice(0, 5);
+
+        document.getElementById('hotBlueList').innerHTML = hotBlues.map(n => `<span class="hc-ball hc-hot-blue">${String(n).padStart(2,'0')} (${blueCounts[n]}次)</span>`).join('');
+        document.getElementById('coldBlueList').innerHTML = coldBlues.map(n => `<span class="hc-ball hc-cold-blue">${String(n).padStart(2,'0')}</span>`).join('');
     }
 
     function renderLedger() {
@@ -859,7 +886,11 @@
             btn.className = 'num-btn blue';
             if (isSelected) btn.classList.add('selected');
             
-            btn.innerText = String(i).padStart(2, '0');
+            let mark = '';
+            if (hotBlues.includes(i)) mark = `<span class="hot-mark">🔥</span>`;
+            if (coldBlues.includes(i)) mark = `<span class="cold-mark">❄️</span>`;
+            
+            btn.innerHTML = `${String(i).padStart(2, '0')}${mark}`;
             btn.onclick = () => toggleBlue(i);
             blueGrid.appendChild(btn);
         }
