@@ -235,7 +235,6 @@
             <span>近10期走势分析</span>
             <span style="font-size: 12px; color: #999; font-weight: normal;">仅做参考</span>
         </div>
-        <!-- 红球冷热 -->
         <div class="hc-row">
             <div class="hc-label" style="color: #e53935;">🔥 红热</div>
             <div class="hc-balls" id="hotRedList"></div>
@@ -244,7 +243,6 @@
             <div class="hc-label" style="color: #1e88e5;">❄️ 红冷</div>
             <div class="hc-balls" id="coldRedList"></div>
         </div>
-        <!-- 蓝球冷热 -->
         <div class="hc-row" style="margin-top: 10px; border-top: 1px dashed #eee; padding-top: 10px;">
             <div class="hc-label" style="color: #1e88e5;">🔥 蓝热</div>
             <div class="hc-balls" id="hotBlueList"></div>
@@ -446,7 +444,6 @@
         renderHistory();
     }
 
-    // 🌟 核心修复：按次数动态判定，不再写死截断
     function analyzeHotCold() {
         let redCounts = {};
         let blueCounts = {};
@@ -458,7 +455,6 @@
             blueCounts[item.blue]++;
         });
 
-        // 红球统计：出现 >= 2次的为热号（最多取前6个防撑爆），没出现的为冷号（最多取前6个）
         let sortedReds = Object.keys(redCounts).map(Number).sort((a,b) => redCounts[b] - redCounts[a]);
         hotReds = sortedReds.filter(n => redCounts[n] >= 2).slice(0, 6); 
         coldReds = sortedReds.filter(n => redCounts[n] === 0).slice(0, 6);
@@ -466,7 +462,6 @@
         document.getElementById('hotRedList').innerHTML = hotReds.map(n => `<span class="hc-ball hc-hot">${String(n).padStart(2,'0')} (${redCounts[n]}次)</span>`).join('');
         document.getElementById('coldRedList').innerHTML = coldReds.map(n => `<span class="hc-ball hc-cold">${String(n).padStart(2,'0')}</span>`).join('');
 
-        // 蓝球统计：出现 >= 2次的为热号（最多取前4个防撑爆），没出现的为冷号（最多取前5个）
         let sortedBlues = Object.keys(blueCounts).map(Number).sort((a,b) => blueCounts[b] - blueCounts[a]);
         hotBlues = sortedBlues.filter(n => blueCounts[n] >= 2).slice(0, 4); 
         coldBlues = sortedBlues.filter(n => blueCounts[n] === 0).slice(0, 5);
@@ -600,11 +595,50 @@
         }
     }
 
+    // 🌟 通用强大的复制函数
+    function copyToClipboard(text) {
+        if (navigator.clipboard && window.isSecureContext) {
+            // 现代 API
+            navigator.clipboard.writeText(text).then(() => {
+                showToast("号码已复制");
+            }).catch(err => {
+                fallbackCopyTextToClipboard(text);
+            });
+        } else {
+            // 回退到老方法 (解决手机浏览器兼容问题)
+            fallbackCopyTextToClipboard(text);
+        }
+    }
+
+    function fallbackCopyTextToClipboard(text) {
+        var textArea = document.createElement("textarea");
+        textArea.value = text;
+        // 放到屏幕外，防止手机键盘弹起
+        textArea.style.top = "0";
+        textArea.style.left = "0";
+        textArea.style.position = "fixed";
+        textArea.style.opacity = "0";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+            var successful = document.execCommand('copy');
+            if (successful) {
+                showToast("号码已复制");
+            } else {
+                showToast("复制失败，请长按手动复制");
+            }
+        } catch (err) {
+            showToast("复制失败，请长按手动复制");
+        }
+        document.body.removeChild(textArea);
+    }
+
     function copyTicket(ticket) {
         let rStr = ticket.tuos.map(n => String(n).padStart(2,'0')).join(' ');
         let bStr = ticket.blue.map(n => String(n).padStart(2,'0')).join(' ');
         let text = `${rStr} + ${bStr} (${ticket.multiple}倍)`;
-        navigator.clipboard.writeText(text).then(() => { showToast("号码已复制"); });
+        copyToClipboard(text);
     }
 
     function copyAllTickets() {
@@ -616,7 +650,7 @@
             let tag = ticket.dans && ticket.dans.length > 0 ? `[胆:${ticket.dans.join(',')}] ` : "";
             text += `第${index+1}注: ${tag}${rStr} + ${bStr} (${ticket.multiple}倍)\n`;
         });
-        navigator.clipboard.writeText(text).then(() => { showToast("所有号码已复制！"); });
+        copyToClipboard(text);
     }
 
     function saveWatch(ticket) {
