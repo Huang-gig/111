@@ -1,8 +1,8 @@
 name: Update Lottery Data
 on:
   schedule:
-    - cron: '30 13 * * *' # 每天 UTC 时间 13:30（北京时间 21:30）自动运行
-  workflow_dispatch: # 允许你手动点击运行
+    - cron: '30 13 * * *' # 每天 UTC 13:30 (北京时间 21:30)
+  workflow_dispatch: 
 
 jobs:
   update:
@@ -13,8 +13,9 @@ jobs:
       
       - name: Fetch Latest Data
         run: |
-          curl -s -H "User-Agent: Mozilla/5.0" "https://www.cwl.gov.cn/cwl_admin/front/cwlkj/search/kjxx/findDrawNotice?name=ssq&issueCount=10&pageNo=1&pageSize=10&systemType=PC" -o raw.json
-          cat raw.json | jq '[.result[] | {code: .code, date: .date, red: (.red | split(",") | map(tonumber)), blue: (.blue | tonumber)}]' > data.json
+          # 改用国内第三方接口，绕过官网封锁
+          curl -s "https://api.pearktrue.cn/api/lottery/?type=ssq" -o raw.json
+          cat raw.json | jq '[.data[] | {code: .issue, date: (.open_time | split(" ")[0]), red: (.front | split(",") | map(tonumber)), blue: (.back | tonumber)}]' > data.json
           
       - name: Commit and Push
         run: |
