@@ -122,7 +122,7 @@
 <div class="container">
     <div class="header">
         <h1>双色球智能选号</h1>
-        <p id="status">正在拉取官方数据...</p>
+        <p id="status">正在请求全网数据源...</p>
         <button class="btn-refresh" onclick="fetchNetworkData(true)">🔄 刷新数据</button>
     </div>
 
@@ -259,7 +259,7 @@
 </div>
 
 <script>
-    // 兜底数据（防止断网完全白屏，不是让你手动输入的）
+    // 兜底数据（如果所有接口全挂，仍能展示）
     const fallbackData = [
         { code: "2026131", date: "2026-11-15", red: [1, 10, 19, 26, 31, 33], blue: 15 },
         { code: "2026130", date: "2026-11-12", red: [1, 2, 6, 16, 20, 28], blue: 2 },
@@ -305,7 +305,7 @@
         renderWatchlist();
         renderHistory();
         
-        document.getElementById('status').innerText = `本地缓存 (第 ${currentDraw.code} 期)`;
+        document.getElementById('status').innerText = `初始化完毕 (第 ${currentDraw.code} 期)`;
         document.getElementById('status').style.color = "#10b981";
 
         let hasComparable = myWatchlist.some(t => t.issueWhenAdded !== currentDraw.code || t.isInfinite);
@@ -316,64 +316,102 @@
         fetchNetworkData();
     }
 
-    // 🌟 核心：使用公共代理请求官方接口
+    // 🌟 核心：暴力多源同步机制
     async function fetchNetworkData(manual = false) {
-        if(manual) showToast("正在从官方拉取最新数据...");
+        if (manual) showToast("正在请求全网数据源...");
         
-        // 中国福彩网官方接口
-        const officialUrl = 'https://www.cwl.gov.cn/cwl_admin/front/cwlkj/search/kjxx/findDrawNotice?name=ssq&issueCount=30&pageNo=1&pageSize=30&systemType=PC';
-        
-        // 免费公开的 CORS 代理，打破浏览器的跨域限制
-        const proxyUrls = [
-            `https://api.allorigins.win/raw?url=${encodeURIComponent(officialUrl)}`,
-            `https://corsproxy.io/?${encodeURIComponent(officialUrl)}`
-        ];
+        // 数据源 A: 韩小韩 API
+        const urlA = 'https://api.vvhan.com/api/lottery?type=ssq';
+        // 数据源 B: 皮皮 API
+        const urlB = 'https://api.pearktrue.cn/api/lottery/?type=ssq';
+        // 数据源 C: 另一个备用开源 JSON
+        const urlC = 'https://raw.githubusercontent.com/wangdaodao/DoubleColorBall/main/data/2026.json';
 
-        let success = false;
+        let fetchedData = null;
 
-        for (let proxy of proxyUrls) {
-            try {
-                const res = await fetch(proxy);
-                if (!res.ok) continue;
-                const json = await res.json();
-                
-                if (json.state === 0 && json.result && json.result.length > 0) {
-                    // 解析官方 JSON 数据
-                    const parsedHistory = json.result.slice(0, 10).map(item => ({
-                        code: item.code,
-                        date: item.date,
-                        red: item.red.split(',').map(Number),
-                        blue: Number(item.blue)
-                    }));
-
-                    latestHistory = parsedHistory;
-                    currentDraw = latestHistory[0];
-                    renderHistory();
-                    analyzeHotCold(); 
-                    document.getElementById('status').innerText = `官网同步 (最新第 ${currentDraw.code} 期)`;
-                    document.getElementById('status').style.color = "#2ecc71";
-                    renderWatchlist();
-                    if(manual) showToast("已从官网同步最新数据！");
-                    
-                    // 自动对奖
-                    let hasComparable = myWatchlist.some(t => t.issueWhenAdded !== currentDraw.code || t.isInfinite);
-                    if (myWatchlist.length > 0 && hasComparable) {
-                        setTimeout(() => { checkPrize(true); }, 500);
-                    }
-                    
-                    success = true;
-                    break; // 成功了就跳出循环
-                }
-            } catch (e) {
-                console.log("代理请求失败，尝试下一个...", e);
+        // 尝试数据源 A
+        try {
+            const res = await fetch(`${urlA}&t=${Date.now()}`);
+            const json = await res.json();
+            if (json.success && json.data) {
+                fetchedData = {
+                    code: json.data.issue,
+                    date: json.data.time.split(' ')[0],
+                    red: json.data.red.split(',').map(Number),
+                    blue: Number(json.data.blue)
+                };
+                console.log("Data from API A");
             }
+        } catch (e) { console.log("API A Failed"); }
+
+        // 如果 A 挂了，尝试 B
+        if (!fetchedData) {
+            try {
+                const res = await fetch(`${urlB}&t=${Date.now()}`);
+                const json = await res.json();
+                if (json.code === 200 && json.data && json.data.length > 0) {
+                    const item = json.data[0];
+                    fetchedData = {
+                        code: item.issue,
+                        date: item.open_time.split(' ')[0],
+                        red: item.front.split(',').map(Number),
+                        blue: Number(item.back)
+                    };
+                    console.log("Data from API B");
+                }
+            } catch (e) { console.log("API B Failed"); }
         }
 
-        if (!success && manual) {
-            showToast("网络波动，拉取失败，仍显示本地缓存");
+        // 如果 A、B 都挂了，尝试 C (历史数据)
+        if (!fetchedData) {
+            try {
+                const res = await fetch(`${urlC}?t=${Date.now()}`);
+                const json = await res.json();
+                if (json.data && json.data.length > 0) {
+                    const item = json.data[json.data.length - 1];
+                    fetchedData = {
+                        code: item.code,
+                        date: item.date,
+                        red: item.red,
+                        blue: item.blue
+                    };
+                    console.log("Data from API C");
+                }
+            } catch (e) { console.log("API C Failed"); }
+        }
+
+        // 处理获取到的数据
+        if (fetchedData && parseInt(fetchedData.code) >= parseInt(currentDraw.code)) {
+            // 如果抓到的期号更新
+            if (parseInt(fetchedData.code) > parseInt(currentDraw.code)) {
+                latestHistory.unshift(fetchedData);
+                latestHistory = latestHistory.slice(0, 10);
+                currentDraw = latestHistory[0];
+                
+                renderHistory();
+                analyzeHotCold(); 
+                document.getElementById('status').innerText = `全网同步成功 (第 ${currentDraw.code} 期)`;
+                document.getElementById('status').style.color = "#2ecc71";
+                renderWatchlist();
+                
+                if (manual) showToast("已同步至最新一期！");
+                
+                // 自动对奖
+                let hasComparable = myWatchlist.some(t => t.issueWhenAdded !== currentDraw.code || t.isInfinite);
+                if (myWatchlist.length > 0 && hasComparable) {
+                    setTimeout(() => { checkPrize(true); }, 500);
+                }
+            } else {
+                document.getElementById('status').innerText = `已是最新 (第 ${currentDraw.code} 期)`;
+                document.getElementById('status').style.color = "#2ecc71";
+                if (manual) showToast("当前已是最新数据");
+            }
+        } else {
+            if (manual) showToast("所有接口均未更新，请稍后再试");
         }
     }
 
+    // ================= 以下是渲染和交互函数 =================
     function renderHistory() {
         const container = document.getElementById('historyList');
         container.innerHTML = '';
