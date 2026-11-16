@@ -11,33 +11,36 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
       
-      - name: Fetch Latest Data with Node.js
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const fs = require('fs');
-            try {
-              // 使用更稳定的聚合接口
-              const res = await fetch('https://api.pearktrue.cn/api/lottery/?type=ssq');
-              const json = await res.json();
-              
-              if (json.code === 200 && json.data && json.data.length > 0) {
-                // 抓取前 10 期，并重新组装成我们前端需要的格式
-                const latest10 = json.data.slice(0, 10).map(item => ({
-                  code: item.issue,
-                  date: item.open_time.split(' ')[0],
-                  red: item.front.split(',').map(Number),
-                  blue: Number(item.back)
-                }));
-                
-                fs.writeFileSync('data.json', JSON.stringify(latest10, null, 2));
-                console.log('数据抓取成功，已生成 data.json');
-              } else {
-                core.setFailed('接口返回数据异常');
-              }
-            } catch (e) {
-              core.setFailed('网络请求失败: ' + e.message);
-            }
+      - name: Write Python Script
+        run: |
+          cat << 'EOF' > update.py
+          import urllib.request
+          import json
+          url = 'https://api.pearktrue.cn/api/lottery/?type=ssq'
+          req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+          try:
+              with urllib.request.urlopen(req) as response:
+                  data = json.loads(response.read().decode('utf-8'))
+              latest10 = []
+              if data.get('code') == 200:
+                  for item in data.get('data', [])[:10]:
+                      latest10.append({
+                          'code': item['issue'],
+                          'date': item['open_time'].split(' ')[0],
+                          'red': [int(x) for x in item['front'].split(',')],
+                          'blue': int(item['back'])
+                      })
+                  with open('data.json', 'w') as f:
+                      json.dump(latest10, f, indent=2)
+                  print('Successfully fetched and saved data.json')
+              else:
+                  print('API returned error')
+          except Exception as e:
+              print(f'Error: {e}')
+          EOF
+          
+      - name: Execute Python Script
+        run: python update.py
           
       - name: Commit and Push
         run: |
