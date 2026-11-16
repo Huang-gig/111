@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>双色球智能选号助手</title>
     <style>
-        /* 样式部分完全不变，为了简洁此处省略，请保留你原有的CSS代码 */
         :root { --red-color: #e53935; --red-glow: #ff5252; --gold-color: #ffb300; --gold-glow: #ffca28; --blue-color: #1e88e5; --blue-glow: #42a5f5; --bg-color: #f2f4f8; --card-bg: #ffffff; --text-main: #2c3e50; --text-reg: #7f8c8d; }
         body { font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; background-color: var(--bg-color); margin: 0; padding: 15px; color: var(--text-main); }
         .container { max-width: 600px; margin: 0 auto; }
@@ -123,7 +122,7 @@
 <div class="container">
     <div class="header">
         <h1>双色球智能选号</h1>
-        <p id="status">本地数据已加载</p>
+        <p id="status">正在拉取官方数据...</p>
         <button class="btn-refresh" onclick="fetchNetworkData(true)">🔄 刷新数据</button>
     </div>
 
@@ -260,8 +259,7 @@
 </div>
 
 <script>
-    // ================= 核心数据部分 =================
-    // 1. 内置最新的10期真实开奖数据 (截至2026131期)
+    // 兜底数据（防止断网完全白屏，不是让你手动输入的）
     const fallbackData = [
         { code: "2026131", date: "2026-11-15", red: [1, 10, 19, 26, 31, 33], blue: 15 },
         { code: "2026130", date: "2026-11-12", red: [1, 2, 6, 16, 20, 28], blue: 2 },
@@ -274,9 +272,6 @@
         { code: "2026123", date: "2026-10-27", red: [4, 5, 20, 21, 26, 30], blue: 12 },
         { code: "2026122", date: "2026-10-25", red: [1, 2, 4, 17, 19, 30], blue: 9 }
     ];
-
-    // 2. 更换为更稳定的数据源地址
-    const API_URL = 'https://data.17500.cn/ssq_desc.txt';
 
     let latestHistory = [...fallbackData]; 
     let myWatchlist = JSON.parse(localStorage.getItem('ssq_watchlist')) || [];
@@ -310,7 +305,7 @@
         renderWatchlist();
         renderHistory();
         
-        document.getElementById('status').innerText = `本地数据已加载 (第 ${currentDraw.code} 期)`;
+        document.getElementById('status').innerText = `本地缓存 (第 ${currentDraw.code} 期)`;
         document.getElementById('status').style.color = "#10b981";
 
         let hasComparable = myWatchlist.some(t => t.issueWhenAdded !== currentDraw.code || t.isInfinite);
@@ -321,44 +316,64 @@
         fetchNetworkData();
     }
 
-    // 🌟 全新的数据拉取与解析逻辑
+    // 🌟 核心：使用公共代理请求官方接口
     async function fetchNetworkData(manual = false) {
-        if(manual) showToast("正在拉取最新数据...");
-        try {
-            const res = await fetch(`${API_URL}?t=${Date.now()}`);
-            if (!res.ok) throw new Error('网络请求失败');
-            const textData = await res.text();
-            
-            // 解析纯文本数据
-            const lines = textData.trim().split('\n').slice(0, 10);
-            const parsedHistory = lines.map(line => {
-                const parts = line.split(/\s+/);
-                return {
-                    code: parts[0],
-                    date: parts[1],
-                    red: parts.slice(2, 8).map(Number),
-                    blue: Number(parts[8])
-                };
-            });
+        if(manual) showToast("正在从官方拉取最新数据...");
+        
+        // 中国福彩网官方接口
+        const officialUrl = 'https://www.cwl.gov.cn/cwl_admin/front/cwlkj/search/kjxx/findDrawNotice?name=ssq&issueCount=30&pageNo=1&pageSize=30&systemType=PC';
+        
+        // 免费公开的 CORS 代理，打破浏览器的跨域限制
+        const proxyUrls = [
+            `https://api.allorigins.win/raw?url=${encodeURIComponent(officialUrl)}`,
+            `https://corsproxy.io/?${encodeURIComponent(officialUrl)}`
+        ];
 
-            if (parsedHistory.length > 0 && parseInt(parsedHistory[0].code) >= parseInt(currentDraw.code)) {
-                latestHistory = parsedHistory;
-                currentDraw = latestHistory[0];
-                renderHistory();
-                analyzeHotCold(); 
-                document.getElementById('status').innerText = `联网同步 (最新第 ${currentDraw.code} 期)`;
-                renderWatchlist();
-                if(manual) showToast("已更新至最新一期！");
-            } else {
-                if(manual) showToast("当前已是最新数据");
+        let success = false;
+
+        for (let proxy of proxyUrls) {
+            try {
+                const res = await fetch(proxy);
+                if (!res.ok) continue;
+                const json = await res.json();
+                
+                if (json.state === 0 && json.result && json.result.length > 0) {
+                    // 解析官方 JSON 数据
+                    const parsedHistory = json.result.slice(0, 10).map(item => ({
+                        code: item.code,
+                        date: item.date,
+                        red: item.red.split(',').map(Number),
+                        blue: Number(item.blue)
+                    }));
+
+                    latestHistory = parsedHistory;
+                    currentDraw = latestHistory[0];
+                    renderHistory();
+                    analyzeHotCold(); 
+                    document.getElementById('status').innerText = `官网同步 (最新第 ${currentDraw.code} 期)`;
+                    document.getElementById('status').style.color = "#2ecc71";
+                    renderWatchlist();
+                    if(manual) showToast("已从官网同步最新数据！");
+                    
+                    // 自动对奖
+                    let hasComparable = myWatchlist.some(t => t.issueWhenAdded !== currentDraw.code || t.isInfinite);
+                    if (myWatchlist.length > 0 && hasComparable) {
+                        setTimeout(() => { checkPrize(true); }, 500);
+                    }
+                    
+                    success = true;
+                    break; // 成功了就跳出循环
+                }
+            } catch (e) {
+                console.log("代理请求失败，尝试下一个...", e);
             }
-        } catch(e) {
-            console.error("拉取失败:", e);
-            if(manual) showToast("网络波动，刷新失败，仍显示本地缓存");
+        }
+
+        if (!success && manual) {
+            showToast("网络波动，拉取失败，仍显示本地缓存");
         }
     }
 
-    // 以下是其余所有渲染和交互函数（保持不变）
     function renderHistory() {
         const container = document.getElementById('historyList');
         container.innerHTML = '';
