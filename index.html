@@ -122,11 +122,10 @@
 <div class="container">
     <div class="header">
         <h1>双色球智能选号</h1>
-        <p id="status">正在请求官方接口...</p>
+        <p id="status">正在请求您的私有数据...</p>
         <button class="btn-refresh" onclick="fetchNetworkData(true)">🔄 刷新数据</button>
     </div>
 
-    <!-- 盈亏账本 -->
     <div class="ledger-card">
         <div class="ledger-item">
             <p>累计投入</p>
@@ -178,7 +177,6 @@
         </div>
     </div>
 
-    <!-- 冷热号统计区 -->
     <div class="hot-cold-card">
         <div class="hc-title">
             <span>近10期走势分析</span>
@@ -255,7 +253,7 @@
 </div>
 
 <script>
-    // 兜底数据（如果网络彻底断开，仍能展示）
+    // 兜底数据
     const fallbackData = [
         { code: "2026131", date: "2026-11-15", red: [1, 10, 19, 26, 31, 33], blue: 15 },
         { code: "2026130", date: "2026-11-12", red: [1, 2, 6, 16, 20, 28], blue: 2 },
@@ -301,7 +299,7 @@
         renderWatchlist();
         renderHistory();
         
-        document.getElementById('status').innerText = `初始化完毕 (第 ${currentDraw.code} 期)`;
+        document.getElementById('status').innerText = `初始化完毕 (本地缓存)`;
         document.getElementById('status').style.color = "#10b981";
 
         let hasComparable = myWatchlist.some(t => t.issueWhenAdded !== currentDraw.code || t.isInfinite);
@@ -312,55 +310,47 @@
         fetchNetworkData();
     }
 
-    // 🚀 核心：通过 Cloudflare Worker 请求官方接口
+    // 🚀 核心：请求我们自己的 GitHub 仓库里的 data.json
     async function fetchNetworkData(manual = false) {
-        if (manual) showToast("正在通过专属通道拉取官方数据...");
+        if (manual) showToast("正在拉取您的专属数据...");
         
-        const officialUrl = 'https://www.cwl.gov.cn/cwl_admin/front/cwlkj/search/kjxx/findDrawNotice?name=ssq&issueCount=30&pageNo=1&pageSize=30&systemType=PC';
-        // 这里填入了你的专属 Worker 地址
-        const proxyUrl = `https://white-band-7753.1106293639.workers.dev/?target=${encodeURIComponent(officialUrl)}`;
+        // 假设你的仓库名是 111，用户名是 Huang-gig。如果不是，请自己修改。
+        const myRepoUrl = 'https://raw.githubusercontent.com/Huang-gig/111/main/data.json';
 
         try {
-            const res = await fetch(proxyUrl);
+            // 加时间戳防止浏览器缓存
+            const res = await fetch(`${myRepoUrl}?t=${Date.now()}`);
+            if (!res.ok) throw new Error("文件未找到");
+            
             const json = await res.json();
             
-            if (json.state === 0 && json.result && json.result.length > 0) {
-                // 解析官方数据
-                const parsedHistory = json.result.slice(0, 10).map(item => ({
-                    code: item.code,
-                    date: item.date,
-                    red: item.red.split(',').map(Number),
-                    blue: Number(item.blue)
-                }));
-
-                if (parsedHistory.length > 0 && parseInt(parsedHistory[0].code) >= parseInt(currentDraw.code)) {
-                    latestHistory = parsedHistory;
+            if (Array.isArray(json) && json.length > 0) {
+                if (parseInt(json[0].code) >= parseInt(currentDraw.code)) {
+                    latestHistory = json;
                     currentDraw = latestHistory[0];
                     renderHistory();
                     analyzeHotCold(); 
-                    document.getElementById('status').innerText = `官方同步成功 (第 ${currentDraw.code} 期)`;
+                    document.getElementById('status').innerText = `个人通道同步 (第 ${currentDraw.code} 期)`;
                     document.getElementById('status').style.color = "#2ecc71";
                     renderWatchlist();
                     
-                    if (manual) showToast("已从官方同步最新数据！");
+                    if (manual) showToast("已同步至最新一期！");
                     
-                    // 自动对奖
                     let hasComparable = myWatchlist.some(t => t.issueWhenAdded !== currentDraw.code || t.isInfinite);
                     if (myWatchlist.length > 0 && hasComparable) {
                         setTimeout(() => { checkPrize(true); }, 500);
                     }
                 } else {
-                    if (manual) showToast("当前已是最新数据");
+                    if (manual) showToast("已是最新数据");
                 }
-            } else {
-                throw new Error("数据解析异常");
             }
         } catch (e) {
             console.error("拉取失败:", e);
-            if (manual) showToast("网络波动，刷新失败");
+            // 如果 data.json 还没生成，或者网络问题，就静默使用兜底数据
         }
     }
 
+    // 以下是其他所有渲染和交互函数（保持不变）
     function renderHistory() {
         const container = document.getElementById('historyList');
         container.innerHTML = '';
