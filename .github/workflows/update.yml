@@ -11,36 +11,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       
-      - name: Fetch Data with Python
+      - name: Fetch Data
         run: |
-          python3 -c "
-          import urllib.request, json
-          url = 'https://data.17500.cn/ssq_desc.txt'
-          req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-          try:
-              with urllib.request.urlopen(req) as res:
-                  lines = res.read().decode('utf-8').strip().split('\n')[:10]
-              data = []
-              for line in lines:
-                  parts = line.split()
-                  if len(parts) >= 9:
-                      data.append({
-                          'code': parts[0],
-                          'date': parts[1],
-                          'red': [int(x) for x in parts[2:8]],
-                          'blue': int(parts[8])
-                      })
-              with open('data.js', 'w', encoding='utf-8') as f:
-                  f.write(f'window.ssqData = {json.dumps(data)};')
-              print('Success! data.js generated.')
-          except Exception as e:
-              print(f'Error: {e}')
-          "
+          curl -s "https://api.pearktrue.cn/api/lottery/?type=ssq" -o raw.json
+          node -e "const fs=require('fs'); const d=JSON.parse(fs.readFileSync('raw.json')); if(d.code===200){const arr=d.data.slice(0,10).map(i=>({code:i.issue,date:i.open_time.split(' ')[0],red:i.front.split(',').map(Number),blue:Number(i.back)})); fs.writeFileSync('data.js', 'window.ssqData = '+JSON.stringify(arr)+';');}"
           
       - name: Commit
         run: |
           git config --local user.email "actions@github.com"
           git config --local user.name "GitHub Action"
           git add data.js
-          git commit -m "Auto update data.js via Python" || exit 0
+          git commit -m "Auto update data.js" || exit 0
           git push
