@@ -114,8 +114,8 @@
         .btn-cancel { background: #eee; color: #333; border: none; border-radius: 10px; padding: 10px 0; width: 100%; font-size: 14px; font-weight: bold; cursor: pointer; margin-top: 10px; }
         .toast { position: fixed; bottom: 50px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 10px 20px; border-radius: 30px; font-size: 14px; display: none; z-index: 2000; }
     </style>
-    <!-- 核心引入：直接加载同目录下的 data.js 文件 -->
-    <script src="./data.js"></script>
+    <!-- 添加了时间戳防缓存，强制浏览器拉取最新的 data.js -->
+    <script src="./data.js?v=20261116"></script>
 </head>
 <body>
 
@@ -124,8 +124,8 @@
 <div class="container">
     <div class="header">
         <h1>双色球智能选号</h1>
-        <p id="status">正在连接数据...</p>
-        <button class="btn-refresh" onclick="fetchNetworkData(true)">🔄 刷新数据</button>
+        <p id="status">正在连接您的专属数据通道...</p>
+        <button class="btn-refresh" onclick="location.reload()">🔄 刷新数据</button>
     </div>
 
     <div class="ledger-card">
@@ -255,7 +255,6 @@
 </div>
 
 <script>
-    // 本地极端兜底数据
     const fallbackData = [
         { code: "2026131", date: "2026-11-15", red: [1, 10, 19, 26, 31, 33], blue: 15 },
         { code: "2026130", date: "2026-11-12", red: [1, 2, 6, 16, 20, 28], blue: 2 },
@@ -301,7 +300,7 @@
         renderWatchlist();
         renderHistory();
         
-        // 由于 <head> 里已经加载了 data.js，这里直接判断 window.ssqData 是否存在
+        // 核心：由于引入的是 data.js，它会在页面加载前直接执行并挂载在 window.ssqData 上
         if (window.ssqData && Array.isArray(window.ssqData) && window.ssqData.length > 0) {
             latestHistory = window.ssqData;
             currentDraw = latestHistory[0];
@@ -318,12 +317,6 @@
             document.getElementById('status').innerText = `初始化完毕 (本地缓存)`;
             document.getElementById('status').style.color = "#10b981";
         }
-    }
-
-    // 点击刷新按钮时的备用拉取逻辑
-    async function fetchNetworkData(manual = false) {
-        if (manual) showToast("请等待 GitHub 机器人更新（通常需几分钟）");
-        setTimeout(() => { location.reload(); }, 1500);
     }
 
     function renderHistory() {
