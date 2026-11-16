@@ -1,7 +1,7 @@
 name: Update Lottery Data
 on:
   schedule:
-    - cron: '0,30 13-15 * * *' # 每天北京时间 21:00 到 23:30，每半小时运行一次（防止单次卡顿）
+    - cron: '0,30 13-15 * * *'
   workflow_dispatch:
 
 jobs:
@@ -13,21 +13,21 @@ jobs:
       
       - name: Fetch Data (Multi-Source)
         run: |
-          # 尝试数据源1：17500纯文本（最稳）
           if curl -s -m 10 "https://data.17500.cn/ssq_desc.txt" > raw.txt && grep -q "2026" raw.txt; then
-            head -n 10 raw.txt | awk '{print "{\"code\":\""$1"\",\"date\":\""$2"\",\"red\":["$3","$4","$5","$6","$7","$8"],\"blue\":"$9"}"}' | jq -s '.' > data.json
-            echo "Source 1 (17500) Succeeded!"
+            head -n 10 raw.txt | awk '{print "{\"code\":\""$1"\",\"date\":\""$2"\",\"red\":["$3","$4","$5","$6","$7","$8"],\"blue\":"$9"}"}' | jq -s '.' > temp.json
+            echo "Source 1 Succeeded!"
           else
-            echo "Source 1 failed, trying Source 2..."
-            # 尝试数据源2：皮皮API
-            curl -s -m 10 "https://api.pearktrue.cn/api/lottery/?type=ssq" | jq '[.data[] | {code: .issue, date: (.open_time | split(" ")[0]), red: (.front | split(",") | map(tonumber)), blue: (.back | tonumber)}]' > data.json
+            curl -s -m 10 "https://api.pearktrue.cn/api/lottery/?type=ssq" | jq '[.data[] | {code: .issue, date: (.open_time | split(" ")[0]), red: (.front | split(",") | map(tonumber)), blue: (.back | tonumber)}]' > temp.json
             echo "Source 2 Succeeded!"
           fi
+          # 关键一步：把 JSON 数据包装成 JS 变量，存为 data.js
+          echo "window.ssqData = $(cat temp.json);" > data.js
+          rm temp.json
           
       - name: Commit
         run: |
           git config --local user.email "actions@github.com"
           git config --local user.name "GitHub Action"
-          git add data.json
-          git commit -m "Auto update data" || exit 0
+          git add data.js
+          git commit -m "Auto update data.js" || exit 0
           git push
