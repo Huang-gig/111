@@ -11,11 +11,33 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
       
-      - name: Fetch Latest Data
-        run: |
-          # 改用国内第三方接口，绕过官网封锁
-          curl -s "https://api.pearktrue.cn/api/lottery/?type=ssq" -o raw.json
-          cat raw.json | jq '[.data[] | {code: .issue, date: (.open_time | split(" ")[0]), red: (.front | split(",") | map(tonumber)), blue: (.back | tonumber)}]' > data.json
+      - name: Fetch Latest Data with Node.js
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            try {
+              // 使用更稳定的聚合接口
+              const res = await fetch('https://api.pearktrue.cn/api/lottery/?type=ssq');
+              const json = await res.json();
+              
+              if (json.code === 200 && json.data && json.data.length > 0) {
+                // 抓取前 10 期，并重新组装成我们前端需要的格式
+                const latest10 = json.data.slice(0, 10).map(item => ({
+                  code: item.issue,
+                  date: item.open_time.split(' ')[0],
+                  red: item.front.split(',').map(Number),
+                  blue: Number(item.back)
+                }));
+                
+                fs.writeFileSync('data.json', JSON.stringify(latest10, null, 2));
+                console.log('数据抓取成功，已生成 data.json');
+              } else {
+                core.setFailed('接口返回数据异常');
+              }
+            } catch (e) {
+              core.setFailed('网络请求失败: ' + e.message);
+            }
           
       - name: Commit and Push
         run: |
