@@ -11,23 +11,36 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       
-      - name: Fetch Data (Multi-Source)
+      - name: Fetch Data with Python
         run: |
-          if curl -s -m 10 "https://data.17500.cn/ssq_desc.txt" > raw.txt && grep -q "2026" raw.txt; then
-            head -n 10 raw.txt | awk '{print "{\"code\":\""$1"\",\"date\":\""$2"\",\"red\":["$3","$4","$5","$6","$7","$8"],\"blue\":"$9"}"}' | jq -s '.' > temp.json
-            echo "Source 1 Succeeded!"
-          else
-            curl -s -m 10 "https://api.pearktrue.cn/api/lottery/?type=ssq" | jq '[.data[] | {code: .issue, date: (.open_time | split(" ")[0]), red: (.front | split(",") | map(tonumber)), blue: (.back | tonumber)}]' > temp.json
-            echo "Source 2 Succeeded!"
-          fi
-          # 关键一步：把 JSON 数据包装成 JS 变量，存为 data.js
-          echo "window.ssqData = $(cat temp.json);" > data.js
-          rm temp.json
+          python3 -c "
+          import urllib.request, json
+          url = 'https://data.17500.cn/ssq_desc.txt'
+          req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+          try:
+              with urllib.request.urlopen(req) as res:
+                  lines = res.read().decode('utf-8').strip().split('\n')[:10]
+              data = []
+              for line in lines:
+                  parts = line.split()
+                  if len(parts) >= 9:
+                      data.append({
+                          'code': parts[0],
+                          'date': parts[1],
+                          'red': [int(x) for x in parts[2:8]],
+                          'blue': int(parts[8])
+                      })
+              with open('data.js', 'w', encoding='utf-8') as f:
+                  f.write(f'window.ssqData = {json.dumps(data)};')
+              print('Success! data.js generated.')
+          except Exception as e:
+              print(f'Error: {e}')
+          "
           
       - name: Commit
         run: |
           git config --local user.email "actions@github.com"
           git config --local user.name "GitHub Action"
           git add data.js
-          git commit -m "Auto update data.js" || exit 0
+          git commit -m "Auto update data.js via Python" || exit 0
           git push
