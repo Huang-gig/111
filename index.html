@@ -122,7 +122,7 @@
 <div class="container">
     <div class="header">
         <h1>双色球智能选号</h1>
-        <p id="status">正在连接您的私人数据通道...</p>
+        <p id="status">正在连接您的专属数据通道...</p>
         <button class="btn-refresh" onclick="fetchNetworkData(true)">🔄 刷新数据</button>
     </div>
 
@@ -309,20 +309,22 @@
         fetchNetworkData();
     }
 
-    // 🚀 核心：通过 jsDelivr 读取 data.json
+    // 🚀 核心：使用同源相对路径，彻底告别跨域！
     async function fetchNetworkData(manual = false) {
         if (manual) showToast("正在拉取最新数据...");
         
-        // 使用了 jsDelivr CDN 加速通道
-        const myRepoUrl = 'https://cdn.jsdelivr.net/gh/Huang-gig/111@main/data.json';
+        // 读取同目录下的 data.json
+        const myRepoUrl = './data.json';
 
         try {
-            const res = await fetch(`${myRepoUrl}?t=${Date.now()}`);
-            if (!res.ok) throw new Error("文件未找到");
+            // 加上时间戳防止浏览器强缓存
+            const res = await fetch(`${myRepoUrl}?t=${Date.now()}`, { cache: 'no-store' });
+            if (!res.ok) throw new Error("文件未找到或正在更新中");
             
             const json = await res.json();
             
             if (Array.isArray(json) && json.length > 0) {
+                // 发现新数据，更新界面
                 if (parseInt(json[0].code) >= parseInt(currentDraw.code)) {
                     latestHistory = json;
                     currentDraw = latestHistory[0];
@@ -339,12 +341,13 @@
                         setTimeout(() => { checkPrize(true); }, 500);
                     }
                 } else {
-                    if (manual) showToast("已是最新数据");
+                    if (manual) showToast("当前已是最新数据");
                 }
             }
         } catch (e) {
             console.error("拉取失败:", e);
-            // 如果 data.json 还没生成，或者网络问题，就静默使用兜底数据
+            // 如果 data.json 还没生成，或者刚更新服务器没反应过来，就静默使用兜底数据
+            if (manual) showToast("数据正在生成中，请稍后刷新");
         }
     }
 
