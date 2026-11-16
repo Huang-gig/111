@@ -122,7 +122,7 @@
 <div class="container">
     <div class="header">
         <h1>双色球智能选号</h1>
-        <p id="status">正在请求您的私有数据...</p>
+        <p id="status">正在连接您的私人数据通道...</p>
         <button class="btn-refresh" onclick="fetchNetworkData(true)">🔄 刷新数据</button>
     </div>
 
@@ -253,7 +253,6 @@
 </div>
 
 <script>
-    // 兜底数据
     const fallbackData = [
         { code: "2026131", date: "2026-11-15", red: [1, 10, 19, 26, 31, 33], blue: 15 },
         { code: "2026130", date: "2026-11-12", red: [1, 2, 6, 16, 20, 28], blue: 2 },
@@ -310,15 +309,14 @@
         fetchNetworkData();
     }
 
-    // 🚀 核心：请求我们自己的 GitHub 仓库里的 data.json
+    // 🚀 核心：通过 jsDelivr 读取 data.json
     async function fetchNetworkData(manual = false) {
-        if (manual) showToast("正在拉取您的专属数据...");
+        if (manual) showToast("正在拉取最新数据...");
         
-        // 假设你的仓库名是 111，用户名是 Huang-gig。如果不是，请自己修改。
-        const myRepoUrl = 'https://raw.githubusercontent.com/Huang-gig/111/main/data.json';
+        // 使用了 jsDelivr CDN 加速通道
+        const myRepoUrl = 'https://cdn.jsdelivr.net/gh/Huang-gig/111@main/data.json';
 
         try {
-            // 加时间戳防止浏览器缓存
             const res = await fetch(`${myRepoUrl}?t=${Date.now()}`);
             if (!res.ok) throw new Error("文件未找到");
             
@@ -350,7 +348,6 @@
         }
     }
 
-    // 以下是其他所有渲染和交互函数（保持不变）
     function renderHistory() {
         const container = document.getElementById('historyList');
         container.innerHTML = '';
