@@ -1,51 +1,25 @@
 name: Update Lottery Data
 on:
   schedule:
-    - cron: '30 13 * * *' # 每天 UTC 13:30 (北京时间 21:30)
-  workflow_dispatch: 
+    - cron: '30 13 * * *'
+  workflow_dispatch:
 
 jobs:
   update:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v3
       
-      - name: Write Python Script
+      - name: Fetch Data
         run: |
-          cat << 'EOF' > update.py
-          import urllib.request
-          import json
-          url = 'https://api.pearktrue.cn/api/lottery/?type=ssq'
-          req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-          try:
-              with urllib.request.urlopen(req) as response:
-                  data = json.loads(response.read().decode('utf-8'))
-              latest10 = []
-              if data.get('code') == 200:
-                  for item in data.get('data', [])[:10]:
-                      latest10.append({
-                          'code': item['issue'],
-                          'date': item['open_time'].split(' ')[0],
-                          'red': [int(x) for x in item['front'].split(',')],
-                          'blue': int(item['back'])
-                      })
-                  with open('data.json', 'w') as f:
-                      json.dump(latest10, f, indent=2)
-                  print('Successfully fetched and saved data.json')
-              else:
-                  print('API returned error')
-          except Exception as e:
-              print(f'Error: {e}')
-          EOF
+          curl -s "https://data.17500.cn/ssq_desc.txt" > raw.txt
+          head -n 10 raw.txt | awk '{print "{\"code\":\""$1"\",\"date\":\""$2"\",\"red\":["$3","$4","$5","$6","$7","$8"],\"blue\":"$9"}"}' | jq -s '.' > data.json
           
-      - name: Execute Python Script
-        run: python update.py
-          
-      - name: Commit and Push
+      - name: Commit
         run: |
           git config --local user.email "actions@github.com"
           git config --local user.name "GitHub Action"
           git add data.json
-          git commit -m "Auto update lottery data" || exit 0
+          git commit -m "Auto update data" || exit 0
           git push
