@@ -1,0 +1,25 @@
+name: Update Lottery Data
+on:
+  schedule:
+    - cron: '30 13 * * *' # 每天 UTC 时间 13:30（北京时间 21:30）自动运行
+  workflow_dispatch: # 允许你手动点击运行
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      
+      - name: Fetch Latest Data
+        run: |
+          curl -s -H "User-Agent: Mozilla/5.0" "https://www.cwl.gov.cn/cwl_admin/front/cwlkj/search/kjxx/findDrawNotice?name=ssq&issueCount=10&pageNo=1&pageSize=10&systemType=PC" -o raw.json
+          cat raw.json | jq '[.result[] | {code: .code, date: .date, red: (.red | split(",") | map(tonumber)), blue: (.blue | tonumber)}]' > data.json
+          
+      - name: Commit and Push
+        run: |
+          git config --local user.email "actions@github.com"
+          git config --local user.name "GitHub Action"
+          git add data.json
+          git commit -m "Auto update lottery data" || exit 0
+          git push
