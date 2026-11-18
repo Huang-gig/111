@@ -1,7 +1,7 @@
 name: Update Lottery Data
 on:
   schedule:
-    - cron: '0,30 13-15 * * *'
+    - cron: '0,30 13-15 * * *' 
   workflow_dispatch:
 
 jobs:
@@ -17,24 +17,24 @@ jobs:
           import urllib.request, json, sys
 
           def fetch_data():
-              url = 'https://api.pearktrue.cn/api/lottery/?type=ssq'
-              req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+              # 首选接口：韩小韩（国内大厂，极度稳定，实测已出132期）
               try:
+                  req = urllib.request.Request('https://api.vvhan.com/api/lottery?type=ssq', headers={'User-Agent': 'Mozilla/5.0'})
                   res = urllib.request.urlopen(req, timeout=10)
                   data = json.loads(res.read().decode('utf-8'))
-                  if data.get('code') == 200:
+                  if data.get('success') and data.get('data'):
                       return [{
-                          'code': i['issue'],
-                          'date': i['open_time'].split(' ')[0],
-                          'red': [int(x) for x in i['front'].split(',')],
-                          'blue': int(i['back'])
-                      } for i in data.get('data', [])[:10]]
+                          'code': data['data']['issue'],
+                          'date': data['data']['time'].split(' ')[0],
+                          'red': [int(x) for x in data['data']['red'].split(',')],
+                          'blue': int(data['data']['blue'])
+                      }]
               except Exception as e:
-                  print("接口1请求失败", e)
-              
-              url2 = 'https://data.17500.cn/ssq_desc.txt'
-              req2 = urllib.request.Request(url2, headers={'User-Agent': 'Mozilla/5.0'})
+                  print("韩小韩API失败:", e)
+
+              # 备用接口：17500
               try:
+                  req2 = urllib.request.Request('https://data.17500.cn/ssq_desc.txt', headers={'User-Agent': 'Mozilla/5.0'})
                   res2 = urllib.request.urlopen(req2, timeout=10)
                   lines = res2.read().decode('utf-8').strip().split('\n')[:10]
                   result = []
@@ -42,40 +42,40 @@ jobs:
                       parts = line.split()
                       if len(parts) >= 9:
                           result.append({
-                              'code': parts[0],
-                              'date': parts[1],
-                              'red': [int(x) for x in parts[2:8]],
-                              'blue': int(parts[8])
+                              'code': parts[0], 'date': parts[1],
+                              'red': [int(x) for x in parts[2:8]], 'blue': int(parts[8])
                           })
                   return result
               except Exception as e:
-                  print("接口2请求失败", e)
-              
+                  print("17500接口失败:", e)
+
               return None
 
-          data = fetch_data()
-          # 🌟 核心保底：如果接口全挂，直接写入这段真实数据，绝不让前端空转！
-          if not data:
-              print("接口全挂，使用内置保底数据")
-              data = [
-                  {"code": "2026131", "date": "2026-11-15", "red": [1, 10, 19, 26, 31, 33], "blue": 15},
-                  {"code": "2026130", "date": "2026-11-12", "red": [1, 2, 6, 16, 20, 28], "blue": 2},
-                  {"code": "2026129", "date": "2026-11-10", "red": [3, 9, 16, 20, 25, 30], "blue": 5},
-                  {"code": "2026128", "date": "2026-11-08", "red": [5, 6, 10, 25, 27, 30], "blue": 11},
-                  {"code": "2026127", "date": "2026-11-05", "red": [13, 14, 19, 25, 29, 32], "blue": 12},
-                  {"code": "2026126", "date": "2026-11-03", "red": [9, 10, 13, 22, 29, 32], "blue": 12},
-                  {"code": "2026125", "date": "2026-11-01", "red": [4, 6, 10, 15, 26, 27], "blue": 11},
-                  {"code": "2026124", "date": "2026-10-29", "red": [3, 11, 17, 22, 23, 29], "blue": 9},
-                  {"code": "2026123", "date": "2026-10-27", "red": [4, 5, 20, 21, 26, 30], "blue": 12},
-                  {"code": "2026122", "date": "2026-10-25", "red": [1, 2, 4, 17, 19, 30], "blue": 9}
-              ]
+          new_data = fetch_data()
+          
+          if not new_data:
+              print("所有接口均失败，保持原有数据不变。")
+              sys.exit(0)
 
-          if data:
+          # 获取本地旧期号
+          old_code = "0"
+          try:
+              with open('data.js', 'r') as f:
+                  content = f.read()
+                  if '"code":' in content:
+                      old_code = content.split('"code": "')[1].split('"')[0]
+          except:
+              pass
+
+          new_code = new_data[0]['code']
+          print(f"本地期号: {old_code}, 抓取期号: {new_code}")
+
+          if int(new_code) >= int(old_code):
               with open('data.js', 'w') as f:
-                  f.write(f'window.ssqData = {json.dumps(data)};')
-              print("生成 data.js 成功！包含", len(data), "条数据")
+                  f.write(f'window.ssqData = {json.dumps(new_data)};')
+              print(f"成功更新至: {new_code}")
           else:
-              print("生成数据为空")
+              print("抓到的期号比本地旧，放弃更新。")
           EOF
           
       - name: Commit
