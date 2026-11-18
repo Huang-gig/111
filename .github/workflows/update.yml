@@ -11,42 +11,46 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       
-      - name: Fetch and Overwrite Data
+      - name: Fetch Global Data
         run: |
           python3 - << 'EOF'
           import urllib.request
           import json
           import sys
 
-          print("=== 开始抓取数据 ===")
-          # 使用国内大厂 CDN 接口，确保全球 DNS 解析无忧
-          url = 'https://api.vvhan.com/api/lottery?type=ssq'
+          print("=== 开始抓取全球数据源 ===")
+          
+          # 抓取托管在 GitHub 上的开源数据，绝对没有 DNS 污染和限流
+          url = 'https://raw.githubusercontent.com/wangdaodao/DoubleColorBall/main/data/2026.json'
           
           try:
               req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
               res = urllib.request.urlopen(req, timeout=15)
               data = json.loads(res.read().decode('utf-8'))
               
-              # 打印返回的数据结构，方便排错
-              print(f"接口返回内容: {data}")
-
-              if data.get('success') and data.get('data'):
-                  new_data = [{
-                      'code': data['data']['issue'],
-                      'date': data['data']['time'].split(' ')[0],
-                      'red': [int(x) for x in data['data']['red'].split(',')],
-                      'blue': int(data['data']['blue'])
-                  }]
+              if data and data.get('data'):
+                  # 取最新的 10 期
+                  latest_10 = data['data'][-10:][::-1]
                   
+                  result = []
+                  for i in latest_10:
+                      result.append({
+                          'code': i['code'],
+                          'date': i['date'],
+                          'red': i['red'],
+                          'blue': i['blue']
+                      })
+                      
                   with open('data.js', 'w', encoding='utf-8') as f:
-                      f.write(f'window.ssqData = {json.dumps(new_data)};')
-                  print(f"✅ 抓取成功！期号：{data['data']['issue']}")
+                      f.write(f'window.ssqData = {json.dumps(result)};')
+                  print(f"✅ 成功抓取！最新期号: {result[0]['code']}")
               else:
-                  print("❌ 接口返回数据格式异常，没有拿到具体内容。")
+                  print("❌ 数据格式异常，没找到 data 字段。")
+                  sys.exit(1)
                   
           except Exception as e:
-              print(f"❌ 抓取失败，具体报错: {e}")
-              sys.exit(1) # 强制报错，不吞掉错误
+              print(f"❌ 抓取失败: {e}")
+              sys.exit(1)
           EOF
           
       - name: Commit and Push
@@ -54,5 +58,5 @@ jobs:
           git config --global user.email "actions@github.com"
           git config --global user.name "GitHub Action"
           git add data.js
-          git commit -m "Force update data.js" || echo "没有变更"
+          git commit -m "Update data.js from GitHub source" || echo "没有变更"
           git push
