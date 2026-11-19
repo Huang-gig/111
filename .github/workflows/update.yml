@@ -11,26 +11,34 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       
-      - name: Fetch Tencent Data
+      - name: Fetch Tencent Data via Proxy
         run: |
           python3 - << 'EOF'
           import urllib.request
           import json
           import sys
 
-          print("=== 开始抓取腾讯官方彩票接口 ===")
-          # 腾讯官方接口，不屏蔽海外，数据秒更
-          url = 'https://web.ifzq.gtimg.cn/appstock/app/lottery/ssq/kjinfo?type=0&num=10'
+          print("=== 开始通过代理抓取腾讯数据 ===")
+          
+          # 使用 corsproxy.io 代购腾讯的接口，彻底解决反爬和IP限制
+          tencent_url = 'https://web.ifzq.gtimg.cn/appstock/app/lottery/ssq/kjinfo?type=0&num=10'
+          proxy_url = f'https://corsproxy.io/?{tencent_url}'
           
           try:
-              req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+              req = urllib.request.Request(proxy_url, headers={'User-Agent': 'Mozilla/5.0'})
               res = urllib.request.urlopen(req, timeout=15)
-              data = json.loads(res.read().decode('utf-8'))
+              raw_text = res.read().decode('utf-8')
               
-              # 提取数据列表
+              data = json.loads(raw_text)
+              
+              # 检查解析出来的是不是字典
+              if not isinstance(data, dict):
+                  print(f"❌ 数据格式不对，返回内容: {raw_text[:100]}")
+                  sys.exit(1)
+                  
               kjinfo = data.get('data', {}).get('kjinfo', [])
               if not kjinfo:
-                  print("❌ 腾讯接口返回为空")
+                  print("❌ 没找到 kjinfo 数据")
                   sys.exit(1)
                   
               result = []
@@ -57,5 +65,5 @@ jobs:
           git config --global user.email "actions@github.com"
           git config --global user.name "GitHub Action"
           git add data.js
-          git commit -m "Update data.js from Tencent" || echo "没有变更"
+          git commit -m "Update data.js via Proxy" || echo "没有变更"
           git push
