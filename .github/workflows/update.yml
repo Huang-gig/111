@@ -11,42 +11,57 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       
-      - name: Fetch Pipi Data
+      - name: Fetch Tencent API with Node.js
         run: |
-          python3 - << 'EOF'
-          import urllib.request
-          import json
-          import sys
+          node - << 'EOF'
+          const fs = require('fs');
+          const https = require('https');
 
-          print("=== 开始抓取皮皮 API 数据 ===")
-          url = 'https://api.pearktrue.cn/api/lottery/?type=ssq'
-          
-          try:
-              req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-              res = urllib.request.urlopen(req, timeout=15)
-              data = json.loads(res.read().decode('utf-8'))
-              
-              if data.get('code') == 200 and data.get('data'):
-                  result = []
-                  for item in data['data']:
-                      result.append({
-                          'code': item['issue'],
-                          'date': item['open_time'].split(' ')[0],
-                          'red': [int(x) for x in item['front'].split(',')],
-                          'blue': int(item['back'])
-                      })
-                      
-                  with open('data.js', 'w', encoding='utf-8') as f:
-                      f.write(f'window.ssqData = {json.dumps(result)};')
-                      
-                  print(f"✅ 抓取成功！最新期号: {result[0]['code']}")
-              else:
-                  print("❌ 接口返回数据异常")
-                  sys.exit(1)
-                  
-          except Exception as e:
-              print(f"❌ 抓取失败: {e}")
-              sys.exit(1)
+          console.log("=== 开始直连腾讯官方接口 ===");
+          const url = 'https://web.ifzq.gtimg.cn/appstock/app/lottery/ssq/kjinfo?type=0&num=10';
+
+          https.get(url, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+              try {
+                // 腾讯经常会包一层回调，我们需要把真正的 JSON 抠出来
+                let jsonStr = data;
+                const start = jsonStr.indexOf('{');
+                const end = jsonStr.lastIndexOf('}');
+                if (start !== -1 && end !== -1) {
+                  jsonStr = jsonStr.substring(start, end + 1);
+                }
+                
+                const parsed = JSON.parse(jsonStr);
+                
+                // 深度挖掘腾讯的数据结构
+                let kjinfo = parsed?.data?.kjinfo;
+                if (!kjinfo && parsed?.data?.data) kjinfo = parsed.data.data;
+                
+                if (!kjinfo || !Array.isArray(kjinfo) || kjinfo.length === 0) {
+                  console.error("❌ 没找到腾讯的开奖数据列表");
+                  process.exit(1);
+                }
+
+                const result = kjinfo.slice(0, 10).map(item => ({
+                  code: item.issue,
+                  date: item.kjtime ? item.kjtime.split(' ')[0] : "2026-11-17",
+                  red: item.red.split(' ').map(Number),
+                  blue: Number(item.blue)
+                }));
+
+                fs.writeFileSync('data.js', 'window.ssqData = ' + JSON.stringify(result) + ';');
+                console.log(`✅ 成功抓取腾讯数据！最新期号: ${result[0].code}`);
+              } catch (err) {
+                console.error("❌ 解析失败:", err.message, "原始数据前100字:", data.substring(0, 100));
+                process.exit(1);
+              }
+            });
+          }).on('error', (err) => {
+            console.error("❌ 网络请求失败:", err.message);
+            process.exit(1);
+          });
           EOF
           
       - name: Commit and Push
@@ -54,5 +69,5 @@ jobs:
           git config --global user.email "actions@github.com"
           git config --global user.name "GitHub Action"
           git add data.js
-          git commit -m "Update data.js" || echo "没有变更"
+          git commit -m "Update data from Tencent API" || echo "没有变更"
           git push
