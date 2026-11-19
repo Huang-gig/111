@@ -11,48 +11,44 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       
-      - name: Fetch 500.com Data
+      - name: Fetch Tencent Data
         run: |
-          # 使用 curl 伪装成真实浏览器去抓静态网页表格
-          curl -s -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" "https://datachart.500.com/ssq/history/newinc/history.php?limit=10&sort=0" > raw.html
-          
           python3 - << 'EOF'
-          import re
+          import urllib.request
           import json
           import sys
 
-          print("=== 开始解析 500彩票网 数据 ===")
+          print("=== 开始抓取腾讯官方彩票接口 ===")
+          # 腾讯官方接口，不屏蔽海外，数据秒更
+          url = 'https://web.ifzq.gtimg.cn/appstock/app/lottery/ssq/kjinfo?type=0&num=10'
           
           try:
-              with open('raw.html', 'r', encoding='gbk', errors='ignore') as f:
-                  html = f.read()
+              req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+              res = urllib.request.urlopen(req, timeout=15)
+              data = json.loads(res.read().decode('utf-8'))
               
-              # 用正则强行提取表格里的期号、号码和日期
-              # 500网的表格结构：期号(t_tr1) -> 6个红球(t_cfont2) -> 蓝球(t_cfont4) -> ... -> 开奖日期(t_tr1)
-              pattern = r'<td class="t_tr1">(\d+)</td>.*?<td class="t_cfont2">(\d+)</td>.*?<td class="t_cfont2">(\d+)</td>.*?<td class="t_cfont2">(\d+)</td>.*?<td class="t_cfont2">(\d+)</td>.*?<td class="t_cfont2">(\d+)</td>.*?<td class="t_cfont2">(\d+)</td>.*?<td class="t_cfont4">(\d+)</td>.*?<td class="t_tr1">([\d-]+)</td>'
-              
-              matches = re.findall(pattern, html)
-              
-              if not matches:
-                  print("❌ 正则匹配失败，500网页面结构可能变了。")
+              # 提取数据列表
+              kjinfo = data.get('data', {}).get('kjinfo', [])
+              if not kjinfo:
+                  print("❌ 腾讯接口返回为空")
                   sys.exit(1)
                   
               result = []
-              for match in matches:
+              for item in kjinfo:
                   result.append({
-                      'code': match[0],
-                      'red': [int(match[1]), int(match[2]), int(match[3]), int(match[4]), int(match[5]), int(match[6])],
-                      'blue': int(match[7]),
-                      'date': match[8]
+                      'code': item['issue'],
+                      'date': item['kjtime'],
+                      'red': [int(x) for x in item['red'].split(' ')],
+                      'blue': int(item['blue'])
                   })
                   
               with open('data.js', 'w', encoding='utf-8') as f:
                   f.write(f'window.ssqData = {json.dumps(result)};')
                   
-              print(f"✅ 成功抓取 500彩票网数据！最新期号: {result[0]['code']}")
-              
+              print(f"✅ 成功抓取腾讯彩票数据！最新期号: {result[0]['code']}")
+                  
           except Exception as e:
-              print(f"❌ 解析失败: {e}")
+              print(f"❌ 抓取失败: {e}")
               sys.exit(1)
           EOF
           
@@ -61,5 +57,5 @@ jobs:
           git config --global user.email "actions@github.com"
           git config --global user.name "GitHub Action"
           git add data.js
-          git commit -m "Update data.js from 500.com" || echo "没有变更"
+          git commit -m "Update data.js from Tencent" || echo "没有变更"
           git push
