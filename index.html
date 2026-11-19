@@ -114,8 +114,6 @@
         .btn-cancel { background: #eee; color: #333; border: none; border-radius: 10px; padding: 10px 0; width: 100%; font-size: 14px; font-weight: bold; cursor: pointer; margin-top: 10px; }
         .toast { position: fixed; bottom: 50px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 10px 20px; border-radius: 30px; font-size: 14px; display: none; z-index: 2000; }
     </style>
-    <!-- 添加了时间戳防缓存，强制浏览器拉取最新的 data.js -->
-    <script src="./data.js?v=20261116"></script>
 </head>
 <body>
 
@@ -124,7 +122,7 @@
 <div class="container">
     <div class="header">
         <h1>双色球智能选号</h1>
-        <p id="status">正在连接您的专属数据通道...</p>
+        <p id="status">正在拉取官方数据...</p>
         <button class="btn-refresh" onclick="location.reload()">🔄 刷新数据</button>
     </div>
 
@@ -255,7 +253,9 @@
 </div>
 
 <script>
+    // 兜底数据
     const fallbackData = [
+        { code: "2026132", date: "2026-11-17", red: [7, 11, 16, 22, 25, 32], blue: 6 },
         { code: "2026131", date: "2026-11-15", red: [1, 10, 19, 26, 31, 33], blue: 15 },
         { code: "2026130", date: "2026-11-12", red: [1, 2, 6, 16, 20, 28], blue: 2 },
         { code: "2026129", date: "2026-11-10", red: [3, 9, 16, 20, 25, 30], blue: 5 },
@@ -264,8 +264,7 @@
         { code: "2026126", date: "2026-11-03", red: [9, 10, 13, 22, 29, 32], blue: 12 },
         { code: "2026125", date: "2026-11-01", red: [4, 6, 10, 15, 26, 27], blue: 11 },
         { code: "2026124", date: "2026-10-29", red: [3, 11, 17, 22, 23, 29], blue: 9 },
-        { code: "2026123", date: "2026-10-27", red: [4, 5, 20, 21, 26, 30], blue: 12 },
-        { code: "2026122", date: "2026-10-25", red: [1, 2, 4, 17, 19, 30], blue: 9 }
+        { code: "2026123", date: "2026-10-27", red: [4, 5, 20, 21, 26, 30], blue: 12 }
     ];
 
     let latestHistory = [...fallbackData]; 
@@ -300,22 +299,43 @@
         renderWatchlist();
         renderHistory();
         
-        // 核心：由于引入的是 data.js，它会在页面加载前直接执行并挂载在 window.ssqData 上
-        if (window.ssqData && Array.isArray(window.ssqData) && window.ssqData.length > 0) {
-            latestHistory = window.ssqData;
-            currentDraw = latestHistory[0];
-            renderHistory();
-            analyzeHotCold(); 
-            document.getElementById('status').innerText = `专属通道同步 (第 ${currentDraw.code} 期)`;
-            document.getElementById('status').style.color = "#2ecc71";
+        document.getElementById('status').innerText = `正在请求国内接口...`;
+        document.getElementById('status').style.color = "#10b981";
+        fetchNetworkData();
+    }
+
+    // 🚀 核心：让手机直接去请求国内极其稳定的皮皮 API
+    async function fetchNetworkData() {
+        const url = 'https://api.pearktrue.cn/api/lottery/?type=ssq';
+        try {
+            const res = await fetch(`${url}&t=${Date.now()}`, { cache: 'no-store' });
+            const json = await res.json();
             
-            let hasComparable = myWatchlist.some(t => t.issueWhenAdded !== currentDraw.code || t.isInfinite);
-            if (myWatchlist.length > 0 && hasComparable) {
-                setTimeout(() => { checkPrize(true); }, 500);
+            if (json.code === 200 && json.data && json.data.length > 0) {
+                const parsed = json.data.slice(0, 10).map(item => ({
+                    code: item.issue,
+                    date: item.open_time.split(' ')[0],
+                    red: item.front.split(',').map(Number),
+                    blue: Number(item.back)
+                }));
+                
+                latestHistory = parsed;
+                currentDraw = latestHistory[0];
+                renderHistory();
+                analyzeHotCold(); 
+                document.getElementById('status').innerText = `同步成功 (第 ${currentDraw.code} 期)`;
+                document.getElementById('status').style.color = "#2ecc71";
+                renderWatchlist();
+                
+                let hasComparable = myWatchlist.some(t => t.issueWhenAdded !== currentDraw.code || t.isInfinite);
+                if (myWatchlist.length > 0 && hasComparable) {
+                    setTimeout(() => { checkPrize(true); }, 500);
+                }
             }
-        } else {
-            document.getElementById('status').innerText = `初始化完毕 (本地缓存)`;
-            document.getElementById('status').style.color = "#10b981";
+        } catch (e) {
+            console.error("拉取失败:", e);
+            document.getElementById('status').innerText = `网络波动，使用保底数据 (第 ${currentDraw.code} 期)`;
+            document.getElementById('status').style.color = "#e53935";
         }
     }
 
