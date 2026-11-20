@@ -121,6 +121,7 @@
     <div class="header">
         <h1>双色球智能选号</h1>
         <p id="status">正在加载本地数据...</p>
+        <button class="btn-refresh" onclick="fetchData(true)">🔄 刷新开奖</button>
     </div>
 
     <div class="ledger-card">
@@ -279,6 +280,12 @@
 </div>
 
 <script>
+    // 官方开奖接口 + 你的 Cloudflare Worker 跨域代理
+    const OFFICIAL_API = "https://www.cwl.gov.cn/cwl_admin/front/cwlkj/search/kjxx/findDrawNotice?name=ssq&issueCount=10";
+    const WORKER_PROXY = "https://lottery-proxy.1106293639.workers.dev/?target=";
+    const CACHE_KEY = "ssq_online_cache";
+    const FETCH_TIMEOUT = 8000;
+
     // 写死的兜底历史数据（已按福彩官网核对到 2026133 期）
     let latestHistory = [
         { code: "2026133", date: "2026-11-19", red: [7, 10, 11, 14, 21, 26], blue: 13 },
@@ -324,6 +331,54 @@
         return Math.round(res);
     }
 
+    // 通过 Worker 代理拉取官方最新开奖；失败回退本地缓存 / 内置兜底
+    async function fetchData(manual = false) {
+        const statusDom = document.getElementById('status');
+        if (manual) { statusDom.innerText = "正在通过专属通道刷新..."; statusDom.style.color = "#1e88e5"; }
+        try {
+            const res = await fetch(WORKER_PROXY + encodeURIComponent(OFFICIAL_API), { signal: AbortSignal.timeout(FETCH_TIMEOUT) });
+            if (!res.ok) throw new Error("代理返回异常");
+            const json = await res.json();
+            const raw = json.result || json.data;
+            if (!Array.isArray(raw) || raw.length < 1) throw new Error("数据为空");
+            latestHistory = raw.slice(0, 10).map(it => {
+                const nums = String(it.red || it.haoma || "").split(",");
+                return {
+                    code: it.code || it.qihao,
+                    date: it.date || it.kaipiaoriqi,
+                    red: nums.slice(0, 6).map(Number).sort((a, b) => a - b),
+                    blue: Number(it.blue != null ? it.blue : nums[6])
+                };
+            });
+            if (localDraw) {
+                if (parseInt(localDraw.code) >= parseInt(latestHistory[0].code)) {
+                    if (parseInt(localDraw.code) === parseInt(latestHistory[0].code)) latestHistory[0] = localDraw;
+                    else { latestHistory.unshift(localDraw); latestHistory = latestHistory.slice(0, 10); }
+                }
+            }
+            currentDraw = latestHistory[0];
+            localStorage.setItem(CACHE_KEY, JSON.stringify(latestHistory));
+            statusDom.innerText = `✅ 通道同步成功 (第 ${currentDraw.code} 期)`;
+            statusDom.style.color = "#2ecc71";
+            analyzeHotCold(); renderHistory(); renderWatchlist();
+            let hasComparable = myWatchlist.some(t => t.issueWhenAdded !== currentDraw.code || t.isInfinite);
+            if (myWatchlist.length > 0 && hasComparable) setTimeout(() => checkPrize(true), 500);
+        } catch (err) {
+            console.error("联网刷新失败:", err);
+            const cache = localStorage.getItem(CACHE_KEY);
+            if (cache) {
+                latestHistory = JSON.parse(cache);
+                currentDraw = latestHistory[0];
+                statusDom.innerText = "⚠️ 联网失败，使用本地缓存";
+                statusDom.style.color = "#f39c12";
+                analyzeHotCold(); renderHistory();
+            } else {
+                statusDom.innerText = "❌ 联网失败，使用内置兜底数据";
+                statusDom.style.color = "#e74c3c";
+            }
+        }
+    }
+
     function init() {
         myWatchlist.forEach(ticket => {
             if (!ticket.dans) ticket.dans = [];
@@ -347,6 +402,9 @@
         if (myWatchlist.length > 0 && hasComparable) {
             setTimeout(() => { checkPrize(true); }, 500);
         }
+
+        // 页面打开后异步走 Worker 代理拉一次最新开奖；失败自动回退缓存/兜底
+        fetchData();
     }
 
     // ===== 手动录入开奖：号码球点选 =====
