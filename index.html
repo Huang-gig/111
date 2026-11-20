@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>双色球智能选号助手</title>
     <style>
+        /* 样式代码保持不变，省略以节省空间 */
         :root { --red-color: #e53935; --red-glow: #ff5252; --gold-color: #ffb300; --gold-glow: #ffca28; --blue-color: #1e88e5; --blue-glow: #42a5f5; --bg-color: #f2f4f8; --card-bg: #ffffff; --text-main: #2c3e50; --text-reg: #7f8c8d; }
         body { font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; background-color: var(--bg-color); margin: 0; padding: 15px; color: var(--text-main); }
         .container { max-width: 600px; margin: 0 auto; }
@@ -288,36 +289,86 @@
         fetchNetworkData();
     }
 
+    // 🚀 核心：多数据源自动切换
     async function fetchNetworkData() {
-        const url = 'https://api.pearktrue.cn/api/lottery/?type=ssq';
+        // 数据源 1：中彩网（官方指定媒体）
+        const source1 = 'https://jc.zhcw.com/port/client_json.php?transactionType=10001001&lotteryId=1&issueCount=10&type=0&pageNum=1';
+        
+        // 数据源 2：天津市政府开放数据平台
+        const source2 = 'https://open.data.tj.gov.cn/api/invoke/e463076c79594f4199a8a68e60bef867';
+
+        // 数据源 3：彩票查询聚合接口
+        const source3 = 'https://cn.apihz.cn/api/caipiao/shuangseqiu.php';
+
+        let json = null;
+
+        // 尝试数据源 1
         try {
-            const res = await fetch(`${url}&t=${Date.now()}`);
-            const json = await res.json();
-            
-            if (json.code === 200 && json.data && json.data.length > 0) {
-                latestHistory = json.data.slice(0, 10).map(item => ({
-                    code: item.issue,
-                    date: item.open_time.split(' ')[0],
-                    red: item.front.split(',').map(Number),
-                    blue: Number(item.back)
-                }));
-                
-                currentDraw = latestHistory[0];
-                renderHistory();
-                analyzeHotCold(); 
-                document.getElementById('status').innerText = `同步成功 (第 ${currentDraw.code} 期)`;
-                document.getElementById('status').style.color = "#2ecc71";
-                renderWatchlist();
-                
-                let hasComparable = myWatchlist.some(t => t.issueWhenAdded !== currentDraw.code || t.isInfinite);
-                if (myWatchlist.length > 0 && hasComparable) {
-                    setTimeout(() => { checkPrize(true); }, 500);
+            const res = await fetch(`${source1}&t=${Date.now()}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data && data.result && data.result.length > 0) {
+                    json = data.result.map(item => ({
+                        code: item.issue,
+                        date: item.openTime.split(' ')[0],
+                        red: item.frontWinningNum.split(' ').map(Number),
+                        blue: Number(item.backWinningNum)
+                    }));
                 }
-            } else {
-                throw new Error("接口暂无最新数据");
             }
-        } catch (e) {
-            console.error("拉取失败:", e);
+        } catch (e) { console.log("源1失败:", e); }
+
+        // 如果源1挂了，尝试源2
+        if (!json) {
+            try {
+                const res = await fetch(`${source2}?t=${Date.now()}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.data && data.data.length > 0) {
+                        json = data.data.map(item => ({
+                            code: item.issue,
+                            date: item.date,
+                            red: item.red.split(',').map(Number),
+                            blue: Number(item.blue)
+                        }));
+                    }
+                }
+            } catch (e) { console.log("源2失败:", e); }
+        }
+
+        // 如果源2也挂了，尝试源3
+        if (!json) {
+            try {
+                const res = await fetch(`${source3}?t=${Date.now()}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.code === 200 && data.data && data.data.length > 0) {
+                        json = data.data.map(item => ({
+                            code: item.issue,
+                            date: item.open_time.split(' ')[0],
+                            red: item.front.split(',').map(Number),
+                            blue: Number(item.back)
+                        }));
+                    }
+                }
+            } catch (e) { console.log("源3失败:", e); }
+        }
+
+        // 统一处理拿到的数据
+        if (json && json.length > 0) {
+            latestHistory = json;
+            currentDraw = latestHistory[0];
+            renderHistory();
+            analyzeHotCold(); 
+            document.getElementById('status').innerText = `同步成功 (第 ${currentDraw.code} 期)`;
+            document.getElementById('status').style.color = "#2ecc71";
+            renderWatchlist();
+            
+            let hasComparable = myWatchlist.some(t => t.issueWhenAdded !== currentDraw.code || t.isInfinite);
+            if (myWatchlist.length > 0 && hasComparable) {
+                setTimeout(() => { checkPrize(true); }, 500);
+            }
+        } else {
             document.getElementById('status').innerText = `网络波动，暂无开奖数据`;
             document.getElementById('status').style.color = "#e53935";
         }
